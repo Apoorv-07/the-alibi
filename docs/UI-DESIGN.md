@@ -78,14 +78,20 @@ ledger:
 title_for("os-ia_2")          → "IA 2"            (short codes upper, real words title, only before a digit;
                                                    a 3+-token title is prose and keeps its own case)
 when_phrase(d, today)         → "Was due Fri 28 Aug · 17 days ago" / "No date on file"
-value_phrase({"date": …})     → "Thu 30 Oct 2026 (date only, no time)"
+value_parts({"date": …})      → ("Wed\xa030\xa0Sep\xa02026", "date only, no time")   # two fields
+value_phrase({"date": …})     → the join, with the caveat in brackets
 option_label(raw_json_label)  → phrased, never `{"date": "2026-10-30", "time": null}`
 _plan_words(feas, summary)    → {"state": "infeasible", "headline": …, "fixes": [{"label", "cost", …}]}
 _trust_words()                → one sentence, cold-aware, shared by home + cockpit + onboarding
 ```
 
-Two rules learned the hard way, both now commented in the code:
+Three rules learned the hard way, all now commented in the code:
 
+* **A value and its caveat are separate fields.** `value_parts()` returns `(value, qualifier)` and
+  `value_phrase()` joins them, because a table cell needs the caveat on its own line while a sentence needs it
+  in brackets — and because a date that wraps mid-number ("Wed 30 Sep 202" / "6") is a date misread. The date
+  phrase carries non-breaking spaces, so it cannot. Prose, review buttons and ledger rows all call the same
+  function, which is the only reason they cannot state three versions of one fact.
 * **A dict key is part of the template contract.** `Presentation.attention()` returns `cards`, not `items`:
   Jinja's `rv.items` resolves to the *method* before the key, so `{% for it in rv.items %}` dies with
   "builtin_function_or_method is not iterable" on the page that carries the product's whole promise.
@@ -96,7 +102,11 @@ Two rules learned the hard way, both now commented in the code:
 Progressive disclosure is four layers, never more than one open: **headline → what ALIBI thinks → why (a
 `<details>` "Why does ALIBI say this?" with sources, claim count, the raw ISO date) → the receipts** (one link
 to `/evidence?subject=…`, and one to the JSON at `/api/graph?task=…`). The raw rows are always one click
-away; they are never the front page.
+away; they are never the front page. On `/evidence` the receipts *are* the layer, so it is one claim per row —
+value, quote, source, offsets — and not a four-column table: a 60-character verbatim quote and a 17-character
+date cannot share a fixed grid, and trying produced either a date over three lines or a quote printed across
+its neighbour. That geometry is measured at four viewports by `make browser-check` (111 checks; 12 of them
+"every row carries its receipt / no value wraps / nothing is clipped").
 
 ## Progressive enhancement, honestly bounded
 
@@ -124,9 +134,13 @@ not even *create* the canvas, orb or cursor nodes: absent is a stronger promise 
 ```bash
 make test                       # 195 tests, incl. tests/test_renovation.py (37, the language contract)
 ./.venv/bin/python scripts/smoke.py     # 24/24 pages render cold + seeded, no template flags
-make browser-check                      # 111 checks in Chromium: both design systems
-node .tools/e2e-review.mjs                # and the one irreversible act, driven through the real Review form
-node .tools/verify-fluid.mjs --shots    # …and .tools/shot-calm-*.png per viewport
+make browser && make browser-check      # 111 checks in Chromium across both design systems
+LD_LIBRARY_PATH=$HOME/.local/lib node .tools/e2e-review.mjs
+                                        # the one irreversible act, driven through the real Review form:
+                                        # radio → "Use that" → toast → reload → "recently answered", and the
+                                        # same for "I'll decide later"; asserts against /api/health too
+LD_LIBRARY_PATH=$HOME/.local/lib node .tools/verify-fluid.mjs --shots
+                                        # …and .tools/shot-calm-*.png per viewport, for the human review
 ```
 
 `verify-fluid` is the one that catches what unit tests cannot: that the WebGL field painted real pixels, that
