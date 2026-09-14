@@ -1,121 +1,148 @@
 {% extends "base.html" %}
 {% block title %}Cockpit{% endblock %}
-{% block body %}
-<h1>Cockpit</h1>
-<p class="sub">What the twin currently believes, what it is not sure about, and what would happen if you
-trusted it blindly. The last number is the one the whole system is built to keep at zero.</p>
 
-<div class="grid g4">
-  {{ stat(stats.claims_verified, 'grounded claims', 'of ' ~ stats.claims ~ ' rows; history is never deleted', 'ok') }}
-  {{ stat(stats.conflicts, 'open conflicts', 'same subject, different value, both sources on file',
-           'bad' if stats.conflicts else 'ok') }}
-  {{ stat(stats.reviews_open, 'awaiting you', 'nothing is promoted out of this queue without a human',
-           'warn' if stats.reviews_open else 'ok') }}
-  {{ stat(stats.false_trust_count, 'false trust', 'trusted rows whose own receipt fails re-verification',
-           'bad' if stats.false_trust_count else 'ok') }}
-</div>
-
-<div class="grid g4" style="margin-top:10px">
-  {{ stat(c.live_tasks, 'tasks tracked', 'from ' ~ stats.sources ~ ' sources') }}
-  {{ stat(stats.supersessions, 'supersessions', 'newer does not mean stronger: see /conflicts') }}
-  {{ stat(stats.cloud_calls, 'cloud calls', stats.cloud_bytes ~ ' bytes egressed (redacted)',
-           'info' if stats.cloud_calls else '') }}
-  {{ stat(stats.injections_quarantined, 'injections quarantined', 'never promoted to state',
-           'info' if stats.injections_quarantined else 'ok') }}
-</div>
-
-{% if health %}
-<div class="panel" style="margin-top:12px">
-  <h3>System health — computed, not asserted
-    <span class="pill {{ 'p-hi' if health.state == 'healthy' else 'p-warn' if health.state == 'degraded' else 'p-bad' }}">
-      {{ health.state }}</span></h3>
-  <div class="row" style="gap:6px">
-    {% for name, comp in health.components | dictsort %}
-    <span class="pill {{ 'p-hi' if comp.state in ('healthy','populated','closed') else 'p-warn' if comp.state == 'degraded' else 'p-bad' if comp.state in ('unavailable','open') else '' }}"
-          title="{{ comp.detail }}{{ ' — ' ~ comp.reason if comp.reason else '' }}"
-          tabindex="0">{{ name | upper }}: {{ comp.state }}</span>
-    {% endfor %}
-    <span class="mini" style="margin-left:auto">probed at {{ health.checked_at[11:19] }} ·
-      <a href="/api/health">json</a></span>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">ledger · {{ stats.claims }} row(s) · mode {{ c_mode or 'rules_only' }}{% if health %} · {{ health.state }}{% endif %}</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Proof,<br>not <em>confidence</em>.</h1>
+      <p class="sub lede" style="margin-top:22px">What the twin currently believes, what it is not sure about,
+        and what would happen if you trusted it blindly. The last number is the one the whole system exists
+        to keep at zero — so it is the first thing on the page, and it is recomputed from the database on
+        every load rather than remembered from the last run.</p>
+      <div class="hero-figures">
+        {{ stat(c.false_trust.count, 'false trust',
+                 (c.false_trust.denominator ~ ' grounded rows re-checked on read') if c.false_trust.denominator
+                 else 'no grounded rows yet — nothing to be wrong about', 'ok', true) }}
+        {{ stat(stats.claims_verified, 'grounded claims', 'of ' ~ stats.claims ~ ' rows; history is never deleted', 'ok') }}
+        {{ stat(stats.reviews_open, 'awaiting you', 'nothing is promoted out of this queue without a human', 'warn') }}
+        {{ stat(stats.conflicts, 'open conflicts', 'same subject, different value, both sources on file', 'bad') }}
+      </div>
+      <div class="cta-row">
+        <form method="post" action="/api/sync" data-magnet="0.2">
+          <input type="hidden" name="demo" value="true">
+          <button class="btn-hero" data-cursor="read">Read the corpus</button>
+        </form>
+        <a class="btn-hero btn-ghost" href="/claims" data-magnet="0.14">Open the ledger</a>
+        <a href="/twin" class="mini">how a fact got here →</a>
+      </div>
+    </div>
+    <div class="scene-col" data-depth="2.2">
+      {{ scene(db) | safe }}
+      <script id="scene-data" type="application/json">{{ scene_payload(db) | tojson }}</script>
+      <p class="mini" style="margin-top:10px">Every dot is one live row of the ledger: clustered by subject,
+        raised by how soon it bites, coloured by the state the verifier gave it. Hover a dot, or open the list
+        beside it — both land on the same claim row. The canvas carries no information the list does not.</p>
+    </div>
   </div>
-  {% if health.warnings %}
-  <div class="sep"></div>
-  {% for w in health.warnings %}
-  <div class="mini" style="color:var(--warn)">▲ {{ w }}</div>
+  <p class="hero-meta">
+    <span>{{ badge('simulated' if c.provider.local == 'regex-extractor-v1' else 'real_model_call') }}</span>
+    <span>rendered from SQLite · no model call on this request</span>
+    <span>light behind this text is decoration, and says so</span>
+  </p>
+</header>
+{% endblock %}
+
+{% block body %}
+{% if health %}
+<section class="strip" data-reveal aria-label="system health, computed">
+  <span class="strip-title">System health — computed, not asserted</span>
+  <span class="strip-verdict">AI: {{ health.components.ai.state }}</span>
+  {% for name, comp in health.components | dictsort %}
+  <span class="chip" data-s="{{ comp.state }}" data-cursor="read" tabindex="0"
+        title="{{ comp.detail }}{{ ' — ' ~ comp.reason if comp.reason else '' }}">{{ name }}: {{ comp.state }}</span>
   {% endfor %}
-  <p class="mini" style="margin:6px 0 0">A degraded chip is a real reading: the app keeps working and says
-    what is missing. There is no configuration that turns one green without fixing it — that is the whole
-    design of this page.</p>
+  <span class="mini" style="margin-left:auto">probed at {{ health.checked_at[11:19] }} ·
+    <a href="/api/health">json</a></span>
+  {% if health.warnings %}
+  <span class="stack" style="flex:1 1 100%;gap:2px">
+    {% for w in health.warnings %}<span class="mini" style="color:var(--warn)">▲ {{ w }}</span>{% endfor %}
+    <span class="mini">A degraded chip is a real reading: the app keeps working and says what is missing.
+      There is no configuration that turns one green without fixing it — that is the whole design of this
+      page.</span>
+  </span>
   {% endif %}
-</div>
+</section>
 {% endif %}
 
 {% if c.false_trust.denominator %}
-<div class="panel" style="margin-top:12px">
+<section class="obj" data-accent="{{ 'bad' if c.false_trust.count else 'hi' }}" data-reveal>
   <h3>False trust rate — recomputed on read, from disk</h3>
-  <div class="row" style="justify-content:space-between">
-    <span>{{ (c.false_trust.rate * 100) | round(2) }}% of {{ c.false_trust.denominator }} grounded rows
-      fail their own receipt right now</span>
-    <span class="mini">{{ c.false_trust.unverifiable }} row(s) unverifiable (source text purged by
-      retention — reported, not counted as clean)</span>
+  <div class="compose">
+    <p class="lead c-5">{{ (c.false_trust.rate * 100) | round(2) }}% of {{ c.false_trust.denominator }}
+      grounded rows fail their own receipt right now.</p>
+    <div class="c-7">
+      <div class="bar {{ 'bad' if c.false_trust.count else '' }}"><i style="width:{{ 100 - (c.false_trust.rate * 100) }}%"></i></div>
+      <p class="mini" style="margin-top:10px">{{ c.false_trust.unverifiable }} row(s) unverifiable — the
+        source text was purged by retention, so it is reported as unverifiable and never counted as clean.
+        Every grounded claim is re-verified against the stored source text on each page load: the quote must be
+        verbatim, the date must appear in that document. A number this cheap to compute is why we do not have
+        to promise it.</p>
+    </div>
   </div>
-  <div class="bar {{ 'bad' if c.false_trust.count else '' }}" style="margin-top:6px">
-    <i style="width:{{ 100 - (c.false_trust.rate * 100) }}%"></i></div>
-  <p class="mini" style="margin:6px 0 0">Every grounded claim is re-verified against the stored
-    source text on each page load: quote must be verbatim, date must appear in that document. A number
-    this cheap to compute is why we do not have to promise it.</p>
-</div>
+</section>
 {% endif %}
 
-<div class="grid g2" style="margin-top:12px">
-  <div class="panel">
+<div class="compose" style="margin-top:26px">
+  <section class="obj c-7" data-reveal>
     <h3>Latest changes <a href="/timeline" class="mini">all →</a></h3>
     {% if timeline %}
-    <table><thead><tr><th>kind</th><th>subject</th><th>what moved</th><th class="num">buffer</th></tr></thead>
-    <tbody>{% for r in timeline %}
-      <tr><td>{{ pill(r.kind, 'p-hi' if r.severity=='HIGH' else ('p-warn' if r.severity=='MED' else '')) }}</td>
-        <td><a href="/timeline?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a></td>
-        <td>{{ r.detail or r.why }}{% if r.is_correction %} {{ pill(r.old_source ~ ' → ' ~ r.new_source, 'p-vio') }}{% endif %}</td>
-        <td class="num">{% if r.buffer_delta_hours %}{{ (r.buffer_delta_hours / 24) | round(1) }}d{% else %}—{% endif %}</td>
-      </tr>{% endfor %}</tbody></table>
+    <div class="stream">
+      {% for r in timeline %}
+      <div class="stream-item" data-severity="{{ r.severity or 'LOW' }}">
+        <div class="row" style="justify-content:space-between;gap:8px">
+          <span><b>{{ r.subject_id }}</b> <span class="mini">· {{ r.predicate or r.kind }}</span></span>
+          <span class="when">{{ pill(r.kind, 'p-hi' if r.severity=='HIGH' else ('p-warn' if r.severity=='MED' else '')) }}</span>
+        </div>
+        <p class="mini" style="margin:5px 0 0">{{ r.detail or r.why }}
+          {% if r.is_correction %} · {{ pill(r.old_source ~ ' → ' ~ r.new_source, 'p-vio') }}{% endif %}</p>
+        <p class="mini" style="margin:4px 0 0">{% if r.buffer_delta_hours %}buffer {{ (r.buffer_delta_hours / 24) | round(1) }}d{% else %}buffer unchanged{% endif %}
+          · <a href="/timeline?subject_id={{ r.subject_id }}">thread</a></p>
+      </div>
+      {% endfor %}
+    </div>
     {% else %}<p class="mini">No changes recorded yet — run a sync.</p>{% endif %}
     <div class="sep"></div>
     <p class="mini">{{ c.changes.head_line }} · {{ c.changes.dates_moved_earlier }} deadline(s) moved
       earlier · {{ c.changes.days_lost }} days of buffer lost · {{ c.changes.corrections }} correction(s)
       across sources</p>
-  </div>
+  </section>
 
-  <div class="panel">
+  <section class="obj c-5" data-reveal>
     <h3>Risk, sorted by what needs you today <a href="/risk" class="mini">all →</a></h3>
-    <div class="row"><span class="mini">the two kinds are never mixed:</span>
-      {{ pill('PROVEN by solver', 'p-bad') }} {{ pill('forecast', 'p-warn') }}</div>
+    <p class="mini">The two kinds are never mixed:</p>
+    <div class="row" style="margin:6px 0 10px">{{ pill('PROVEN by solver', 'p-bad') }} {{ pill('forecast', 'p-warn') }}</div>
     {% if risks %}
-    <table style="margin-top:6px"><tbody>
+    <div class="stack">
     {% for r in risks %}
-      <tr><td>{{ pill(r.status, 'p-bad' if r.status=='PROVEN_INFEASIBLE' else ('p-warn' if r.status=='AT_RISK' else ('p-info' if r.status=='PENDING' else 'p-hi'))) }}</td>
-        <td><b>{{ r.subject_id }}</b><br><span class="mini">{{ r.method }}{% if r.is_prediction %} · prediction{% else %} · computed{% endif %}</span></td>
-        <td>{% if r.probability %}p={{ (r.probability * 100) | round(0) }}%{% else %}no probability{% endif %}</td>
-        <td>{{ (r.recommendation or r.evidence or '')[:120] }}</td></tr>
-    {% endfor %}</tbody></table>
+      <div class="row" style="align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px">
+        <span style="flex:1 1 auto"><b>{{ r.subject_id }}</b>
+          <span class="mini">· {{ r.method }}{% if r.is_prediction %} · prediction{% else %} · computed{% endif %}</span></span>
+        <span class="mini">{{ pill(r.status, 'p-bad' if r.status=='PROVEN_INFEASIBLE' else ('p-warn' if r.status=='AT_RISK' else ('p-info' if r.status=='PENDING' else 'p-hi'))) }}</span>
+        <span class="num">{% if r.probability %}p={{ (r.probability * 100) | round(0) }}%{% else %}no probability{% endif %}</span>
+      </div>
+      <p class="mini" style="margin:-2px 0 6px">{{ (r.recommendation or r.evidence or '')[:150] }}</p>
+    {% endfor %}
+    </div>
     {% else %}<p class="mini">No forecasts yet — the pipeline writes one row per run.</p>{% endif %}
-  </div>
-</div>
+  </section>
 
-<div class="grid g2" style="margin-top:12px">
-  <div class="panel">
+  <section class="obj c-6" data-accent="warn" data-reveal>
     <h3>Needs a human <a href="/queue" class="mini">queue →</a></h3>
     {% for r in reviews %}
-      <div class="panel" style="background:var(--panel2);margin-bottom:6px">
+      <div class="obj" data-accent="warn" style="margin-bottom:8px">
         <div class="row" style="justify-content:space-between">
           <b>{{ r.question }}</b>{{ pill(r.kind, 'p-warn') }}</div>
         <div class="mini">{{ r.why[:200] }} · <a href="/claims?q={{ r.subject_id }}">{{ r.subject_id }}</a></div>
       </div>
     {% else %}<p class="mini">Nothing waiting. That is a state, not a claim of perfection.</p>{% endfor %}
-  </div>
-  <div class="panel">
+  </section>
+
+  <section class="obj c-6" data-reveal>
     <h3>Actions <a href="/actions" class="mini">approve →</a></h3>
     {% for a in actions %}
-      <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0">
+      <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0">
         <span><b>{{ a.kind }}</b> <span class="mini">{{ a.target }}</span><br>
           <span class="mini">{{ a.policy_reason[:120] }}</span></span>
         <span>{{ pill(a.risk_class, 'p-bad' if a.risk_class in ('HIGH_IMPACT_WRITE','IRREVERSIBLE') else 'p-hi') }}
@@ -123,26 +150,37 @@ trusted it blindly. The last number is the one the whole system is built to keep
       </div>
     {% else %}<p class="mini">No actions requested. Tier-1 (anything that leaves this machine) only
       exists after a solver proof and an explicit approval.</p>{% endfor %}
-  </div>
-</div>
+  </section>
 
-<div class="panel" style="margin-top:12px">
-  <h3>Last sync</h3>
-  {% if sync %}
-  <div class="row">
-    <span class="mini">{{ sync.sources }} artifact(s) · {{ sync.claims }} claim(s) written ·
-      {{ sync.rejected }} candidate(s) refused by the verifier · {{ sync.reviews }} review item(s) opened ·
-      {{ sync.changes }} change event(s)</span>
-    {{ pill(sync.ms ~ ' ms wall clock', 'p-info') }}
-    {{ badge('simulated' if c.provider.local == 'regex-extractor-v1' else 'real_model_call') }}
-  </div>
-  {% if c.provider.local == 'regex-extractor-v1' %}
-  <p class="notice" style="margin-top:8px">Extraction on this machine is the offline deterministic
-    simulator (no model installed). The verifier, ledger, conflict, solver and UI paths are the real
-    ones — that is what this page is showing. Start Ollama with
-    <code>ollama pull gemma4:e4b</code> and re-sync to see the model path.</p>
-  {% endif %}
-  {% else %}<p class="mini">Nothing synced in this process yet. <b>⟳ sync now</b> (left) reads the demo
-    corpus from disk.</p>{% endif %}
+  <section class="obj c-12" data-reveal>
+    <h3>What else is on file</h3>
+    <div class="grid g4">
+      {{ stat(c.live_tasks, 'tasks tracked', 'from ' ~ stats.sources ~ ' sources') }}
+      {{ stat(stats.supersessions, 'supersessions', 'newer does not mean stronger: see /conflicts') }}
+      {{ stat(stats.cloud_calls, 'cloud calls', stats.cloud_bytes ~ ' bytes egressed (redacted)',
+               'info' if stats.cloud_calls else '') }}
+      {{ stat(stats.injections_quarantined, 'injections quarantined', 'never promoted to state',
+               'info' if stats.injections_quarantined else 'ok') }}
+    </div>
+  </section>
+
+  <section class="obj c-12" data-reveal>
+    <h3>Last sync</h3>
+    {% if sync %}
+    <div class="row">
+      <span class="mini">{{ sync.sources }} artifact(s) · {{ sync.claims }} claim(s) written ·
+        {{ sync.rejected }} candidate(s) refused by the verifier · {{ sync.reviews }} review item(s) opened ·
+        {{ sync.changes }} change event(s)</span>
+      {{ pill(sync.ms ~ ' ms wall clock', 'p-info') }}
+    </div>
+    {% if c.provider.local == 'regex-extractor-v1' %}
+    <p class="notice" style="margin-top:12px">Extraction on this machine is the offline deterministic
+      simulator (no model installed). The verifier, ledger, conflict, solver and UI paths are the real
+      ones — that is what this page is showing. Point <code>LM_STUDIO_BASE_URL</code> at a running model
+      and re-sync to see the model path.</p>
+    {% endif %}
+    {% else %}<p class="mini">Nothing synced in this process yet. <b>Read the corpus</b> (top of the page,
+      or in the rail) loads the demo artifacts from disk.</p>{% endif %}
+  </section>
 </div>
 {% endblock %}

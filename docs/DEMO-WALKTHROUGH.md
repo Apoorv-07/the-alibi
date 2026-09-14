@@ -1,10 +1,11 @@
-# The live walkthrough (12 minutes, and what to say)
+# The live walkthrough (14 minutes, and what to say)
 
 Written so that someone else can present this without me. Every command is copy-pasteable; every claim in the
 script is something the screen shows. Two tabs: a terminal and the browser.
 
-**Fallback plan:** if nothing else works, run `make dev` and show `/` + `/conflicts` + `/feasibility`, then
-`curl localhost:8000/metrics | grep false_trust`. That is the whole argument in three screens and one command.
+**Fallback plan:** if nothing else works, run `make dev` and show `/` (Home: what needs you, in words) +
+`/review` (answer one disagreement) + `/feasibility`, then `curl localhost:8000/metrics | grep false_trust`.
+That is the whole argument in three screens and one command.
 
 ---
 
@@ -51,7 +52,26 @@ Say: "`/healthz` says the process is up. `/api/health` says whether the *system*
 there is a query or a live probe — the `ai` chip is `degraded` because a deterministic extractor is reading
 documents, not a model. I could not make that chip green without installing a model."
 
-Then open **`/`** (cockpit). Point at the mode banner first, because it licenses every number below it.
+Then open **`/`** — Home, the calm page a student actually lives in. Point at the sidebar line
+(`model auto · local gemma4:e4b · cloud off`) and the status sentence under it first, because they license
+every number below them. The cockpit, with the WebGL field of facts, is one click away at
+**`/technical/cockpit`** — open it last, as the proof that the machinery is the same machinery.
+
+## Phase 2b — the six destinations (90 s, and the half of the demo that is the product)
+
+| # | do | say |
+|---|---|---|
+| a | Home, cold (no corpus): `/?` with an empty DB | "It redirected me to `/onboard`, because 'what matters now' has no answer with nothing on file. And it doesn't show me `0 of 0 facts verified` as a statistic — it says *nothing has been read yet, ALIBI does not fill this in*. That sentence is the product's honesty, rendered on the empty state." |
+| b | Load the sample corpus with the one labelled button | "One action to start, and the sample is labelled a sample everywhere it appears. Nothing pretends to be my data." |
+| c | Home, warm | "The header is the whole argument: *7 things need you*, and everything else is background. 80 % obligations and receipts, 15 % attention, 5 % system status — and if nothing needs me, that section is absent, not 'All clear 🎉' occupying the fold." |
+| d | A task card → **Why does ALIBI say this?** | "Four layers, one open: headline, what it thinks, why, then the rows. Effort says *(assumed)* because no source states it — it does not dress a default up as a fact." |
+| e | The disputed card ("Two dates on file — you choose"), then **Review** → pick the later date, add a note, **Use that** | "Two sources disagree about IA 2's date. The card refuses to pick; the Review sheet asks me; my choice becomes a ledger row with my words and the moment attached. `defer` on the same card is stored as *postponed*, not as an answer — an inbox that pretends I replied is worse than one that nags." |
+| f | Ask ALIBI → "what is due this week", then "what is my hostel mess fee" | "Second answer says it found no rows and will not invent any. There is no chat stream here: an answer is a sentence plus the rows behind it, produced by reading the ledger — the panel says *no model call*, because that is true." |
+| g | Settings → **Reading preferences** → turn the fluid layer off, then back on | "Motion is a reader's setting, not a house style. The veto is stored in my browser, checked at line 1 of each of the three scripts that would otherwise own a frame loop — and the six pages never create a canvas, an orb or a cursor at all. Absent, not `display:none`." |
+
+Then continue into the technical pages, which is where the audit lives: **`/technical`** groups all eleven,
+grouped by what they are for. Every old URL still resolves — the renovation moved them out of the way, not out
+of the product.
 
 ## Phase 3 — the core loop (5 min)
 
@@ -59,7 +79,7 @@ Then open **`/`** (cockpit). Point at the mode banner first, because it licenses
 |---|---|---|
 | 1 | `/sources` | "Six artefacts: three syllabus pages, a WhatsApp export, a photographed notice, an ERP screen. Content-addressed, so re-uploading one is a no-op." |
 | 2 | `/claims` — filter to `dbms-lab_4`, click claim `due_at` | "The claim is the tuple, the receipt is the verbatim span plus its offsets, and the checker ran `verify_claim` on this exact text. Watch the footer: 18 ms, measured on this request." |
-| 3 | `/conflicts` → the `cs-registration` card | "The group says 24 Sep, the notice says 30 Sep. Both are grounded, both are visible, precedence retired neither — so the plan uses the **earliest safe** date and the UI says that's the rule that fired. This is the difference between a contradiction engine and a chatbot with a list." |
+| 3 | `/conflicts` → the `cs-registration` card (or `/review`, the same disagreement as a decision) | "The group says 24 Sep, the notice says 30 Sep. Both are grounded, both are visible, precedence retired neither — so the plan uses the **earliest safe** date and the UI says that's the rule that fired. This is the difference between a contradiction engine and a chatbot with a list." |
 | 4 | `/queue` → open the `CONFLICTING_STATEMENTS` item | "Every open conflict is also an open question with an answer box. A badge nobody can act on is decoration." |
 | 5 | Type `The registrar confirmed 30 Sep 2026 by email.` into *your answer*, predicate `due_at`, press **use my answer** | "Now my sentence is a ledger row with `method=manual` and my own text as its receipt — not a to-do item I closed. If I type two dates it refuses to pick one; if I type something shorter than the quote floor it refuses that too." Reload `/claims` and point at the new row. |
 | 6 | `/timeline`, then `/feasibility` | "CP-SAT over the next 14 days: fixed lab slots, a 6 h sleep floor, a per-day cap. `INFEASIBLE`, core `['no_miss']`, `slack_hours = -3.0`. Both remedies are priced and both say `violates_your_sleep_floor` — 'just work five more hours' is offered and never ranked above an extension." |
@@ -120,6 +140,14 @@ rm -f /tmp/scratch.db /tmp/inj.txt
 Say what the DB is: one SQLite file, `ALIBI_DB`, containing claims, receipts, conflicts, forecasts, the audit
 log and the change stream — `/api/export/ledger.json` is the same thing in portable form.
 
+## Two things the UI is explicitly *not*
+
+* **Not a dashboard.** No grid of equal panels, no KPI row, no "system status" hero. Home answers one question
+  and the rest of the page is ordered by how much it changes what you do today.
+* **Not sci-fi as an aesthetic.** The glow exists on the technical pages, over a mock, where it says something
+  (each node is a real claim, coloured by its verification state). On the pages a student reads at 1 a.m. the
+  sophistication is in the phrasing and the receipts, not in the pixels.
+
 ## Questions you will be asked, and the answers this repo can back
 
 | question | answer, with the artefact |
@@ -134,5 +162,7 @@ log and the change stream — `/api/export/ledger.json` is the same thing in por
 
 ## Timing cheat-sheet
 
-`make dev` 60 s · verification 90 s · core loop 5 min · failures 2 min · tests 20 s · buffer 2 min.
-If you have 5 minutes: steps 1, 3, 5, 6, 10 of the core loop, plus failure demo 1.
+`make dev` 60 s · verification 90 s · the six destinations 90 s · core loop 5 min · failures 2 min · tests 20 s
+· buffer 2 min.
+If you have 5 minutes: phase 2b rows c, d, e (Home → a card's *why* → answer a disagreement), then steps 3, 6
+and 10 of the core loop. If you have 12: drop phase 2b row g and failure demo 3.

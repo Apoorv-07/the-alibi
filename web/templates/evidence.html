@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_ui.html" import empty %}
+{% block title %}Evidence{% endblock %}
+
+{% block hero scoped %}
+{% set ev = present.evidence(q=q, subject=subject) %}
+<header class="head">
+  <p class="kicker">{{ ev.count }} claim{{ '' if ev.count == 1 else 's' }} ·
+    {{ ev.cards | length }} thing{{ '' if ev.cards | length == 1 else 's' }} they describe</p>
+  <h1>{% if subject %}Where {{ ev.trail.title }} came from{% else %}What ALIBI knows, and where from{% endif %}</h1>
+  <p class="lede">A claim is only worth what its receipt is worth: the document, the exact words, the offset
+    they were read at, and whether they still match.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+{% if subject %}
+<a class="act back" href="/evidence">← all evidence</a>
+<p class="kicker">{{ ev.trail.course }} · {{ ev.trail.claims | length }} claim{{ '' if ev.trail.claims | length == 1 else 's' }} · {{ subject }}</p>
+<section class="lin" aria-label="the trail for one subject">
+  <ol class="flow">
+    {% for c in ev.trail.claims %}
+    <li class="flow__step">
+      <p class="flow__h"><b>{{ c.predicate_word }}</b> · {{ c.verify_word }}
+        <span class="mono faint">claim {{ c.id }}</span></p>
+      <p class="flow__v">{{ c.value_text }}</p>
+      {% if c.quote %}
+      <blockquote class="quote">{{ c.quote }}</blockquote>
+      <p class="mini faint">from {{ c.source_word }} · chars {{ c.char_start }}–{{ c.char_end }} of the document
+        {% if c.captured_at %}· read {{ c.captured_at[:10] }}{% endif %}</p>
+      {% else %}
+      <p class="mini faint">No quote on this row: {% if c.verify_state == 'unverifiable' %}the raw text has
+        been purged by the retention window, so it can no longer be re-checked — it is still your claim, and it
+        is no longer ALIBI's proof.{% else %}it was recorded without one, so it is not trusted.{% endif %}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+    {% for e in ev.trail.edges %}
+    <li class="flow__edge mono faint">{{ e.edge }} → {{ e.to_subject or ('claim ' ~ e.to_claim) }}</li>
+    {% endfor %}
+  </ol>
+  <p class="mini">This list is the same graph the technical page draws, read top to bottom:
+    <a class="act" href="/twin?subject_id={{ subject }}">subject graph</a> ·
+    <a class="act" href="/api/graph?task={{ subject }}">raw JSON</a></p>
+</section>
+{% endif %}
+
+<form class="filters" method="get" action="/evidence">
+  <label class="sr-only" for="eq">Search the ledger</label>
+  <input id="eq" type="search" name="q" value="{{ q }}" placeholder="Search claims, quotes, dates…">
+  <button class="btn" type="submit">Search</button>
+  {% if ev.filtered %}<a class="btn btn--quiet" href="/evidence">Clear</a>{% endif %}
+</form>
+
+{% if ev.cards %}
+<section class="evi" aria-label="claims by subject">
+  {% for g in ev.cards %}
+  <article class="evi__g">
+    <header class="evi__h">
+      <h3><a href="/evidence?subject={{ g.subject }}">{{ g.title }}</a></h3>
+      <p class="mini">{{ g.course }} · {{ g.n }} claim{{ '' if g.n == 1 else 's' }} ·
+        {{ g.verified }} verified{% if g.n > g.verified %}, {{ g.n - g.verified }} not{% endif %}</p>
+    </header>
+    <table class="tbl">
+      <caption class="sr-only">Claims about {{ g.title }}</caption>
+      <thead><tr><th scope="col">What it says</th><th scope="col">Value</th><th scope="col">Source</th>
+        <th scope="col">Status</th></tr></thead>
+      <tbody>
+        {% for c in g.claims %}
+        <tr>
+          <td>{{ c.predicate_word }}{% if c.valid_to %} <span class="tag">superseded</span>{% endif %}</td>
+          <td>{{ c.value_text }}</td>
+          <td>{{ c.source_word }}{% if c.quote %}
+            <blockquote class="quote quote--sm">{{ c.quote | truncate(150) }}</blockquote>{% endif %}</td>
+          <td>{{ c.verify_word }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+{{ empty("No claims match that.",
+         "Either the search is too narrow, or the fact is not in anything ALIBI has read. The second case is a
+          real answer — it means the system will not claim to know it.", "See everything on file", "/evidence") }}
+{% endif %}
+{% endblock %}

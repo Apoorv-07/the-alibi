@@ -1,19 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Actions{% endblock %}
-{% block body %}
-<h1>Actions &amp; approvals</h1>
-<p class="sub">Bounded autonomy. A risk class decides what may happen; a solver proof decides whether it
-  is worth doing; a human decides anything that leaves this machine. Nothing below was authorised by a
-  model's confidence — there is no such input.</p>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">bounded autonomy · {{ rows | length }} request(s) in this database</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">A model may<br><em>ask</em>. Never act.</h1>
+      <p class="sub lede" style="margin-top:20px">A risk class decides what may happen; a solver proof decides whether it is worth doing; a human decides anything that leaves this machine. Nothing below was authorised by a model's confidence — there is no such input.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">Approving does not send anything.</p>
+      <p class="mini" style="margin-top:10px">It reveals the drafted text so you can paste it. If you disagree with a word, the fix is to correct the claim it cites, not to edit the draft by hand — that keeps the draft and the ledger from diverging.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
 
-<div class="grid g4" style="margin-bottom:12px">
+{% block body %}
+
+<div class="hero-figures" style="margin-bottom:8px">
   {{ stat(rows | length, 'requests', 'this database, all time') }}
   {{ stat(rows | selectattr('status','eq','pending') | list | length, 'awaiting you', 'class C and D stop here', 'warn') }}
   {{ stat(rows | selectattr('status','eq','executed') | list | length, 'executed', 'reversible, local only', 'ok') }}
   {{ stat(rows | selectattr('policy_decision','eq','REFUSED') | list | length, 'refused by policy', 'never attempted', 'info') }}
 </div>
 
-<table>
+<div class="ledger-wrap"><table>
 <thead><tr><th>#</th><th>kind</th><th>risk class</th><th>target</th><th>policy</th><th>why (verbatim)</th>
   <th>claims cited</th><th>solver</th><th>status</th><th>decide</th></tr></thead>
 <tbody>
@@ -48,7 +60,7 @@
   INFEASIBLE proof, and the never-list (delete a submission, mark attendance, run a shell) cannot be
   enabled by any setting.</td></tr>
 {% endfor %}
-</tbody></table>
+</tbody></table></div>
 
 {% for a in drafts %}{% if a.payload and a.payload.get('body') %}
 <div class="panel" style="margin-top:12px">

@@ -21,3 +21,9 @@ venv/
 build/
 dist/
 *.egg-info/
+
+# the browser harness's own install: 19 MB of vendored Playwright, re-created by `make browser`
+.tools/node_modules/
+.tools/package-lock.json
+.tools/*.png
+.tools/verify-*.txt

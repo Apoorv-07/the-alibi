@@ -1,10 +1,15 @@
 # Every command here is one a reviewer would otherwise type by hand, in this order.
-PY ?= python3
+# `PY` resolves to `.venv/bin/python` when that directory exists, else `python3`. A caller can still set
+# `PY=…` explicitly. This is not sugar: `make seed` used to shell out to a bare `python3` while the venv
+# held ortools/fastapi, so every block reported `promoted=0`, the solver raised ModuleNotFoundError, and the
+# target exited nonzero — a half-run that looked like a data problem. One interpreter, chosen once, here.
+
+PY ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 
 # `checks` would otherwise be considered "up to date" because a *directory* of that name exists — make
 # silently does nothing and exits 0, which is the worst possible failure for a CI target: a green run
 # that ran no checks. Everything below is therefore declared phony, and `verify` depends on all of them.
-.PHONY: help test smoke checks verify poc eval seed serve dev dev-check docker docker-llm lint clean retention
+.PHONY: help test smoke checks verify poc eval seed serve dev dev-check docker docker-llm lint clean retention browser browser-check
 help:
 	@grep -E '^[a-z-]+:.*#' Makefile | sed 's/:.*#/ \t/' | sort
 
@@ -15,6 +20,7 @@ smoke:           ## boot the app on an EMPTY database, seed it, render every pag
 	$(PY) scripts/smoke.py
 
 checks:          ## focused probes: verifier edges, attribution, scenario calibration
+	@test -x "$(firstword $(PY))" -o "$(PY)" = python3 || { echo "PY=$(PY) is not runnable"; exit 2; }
 	$(PY) checks/check_ground.py && $(PY) checks/check_link.py && $(PY) checks/calibrate.py
 
 poc:             ## end-to-end pipeline trace, printed
@@ -43,6 +49,16 @@ docker-llm:      ## same, with a local Ollama sidecar (needs a GPU)
 lint:            ## syntax + unused-import sweep without needing a linter installed
 	$(PY) -m compileall -q alibi tests evaluation checks run_poc.py
 	@echo "compiled clean"
+
+browser:           ## install the Chromium + shared libs the visual harness needs (needs network)
+	cd .tools && npm install --no-audit --no-fund playwright
+	cd .tools && npx playwright install chromium chromium-headless-shell
+	@echo "if chromium cannot start here: it wants libnss3/libnspr4/libatk/libcups/libasound; see"
+	@echo "docs/UI-DESIGN.md → 'Running the browser harness on a bare container'"
+
+browser-check:     ## the visual contract: 99 checks in Chromium across both design systems
+	@curl -sf -o /dev/null http://127.0.0.1:8000/healthz || { echo "needs a running app: make dev  (or: ALIBI_DB=./alibi.db ./venv/bin/python -m uvicorn alibi.server:app --port 8000)"; exit 2; }
+	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH:-$$HOME/.local/lib} node .tools/verify-fluid.mjs
 
 verify: test checks smoke   ## everything CI runs, in the order CI runs it
 

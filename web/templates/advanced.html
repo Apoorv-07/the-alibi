@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Advanced{% endblock %}
+
+{% block hero scoped %}
+<header class="head">
+  <p class="kicker">{{ st.claims }} claims · {{ st.sources }} sources · {{ st.reviews_open }} open questions</p>
+  <h1>The machinery, when you want it</h1>
+  <p class="lede">Nothing here is hidden from you, and nothing here is what you have to look at. These are the
+    surfaces the six main screens are assembled from: the raw ledger, the verifier's own report, the solver,
+    the audit trail, and where your text went.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+<section class="advg">
+  {% for title, items in groups %}
+  <div class="advg__g">
+    <h2>{{ title }}</h2>
+    <ul>
+      {% for key,label,href in items %}
+      <li><a href="{{ href }}">{{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</section>
+<p class="mini">The field of facts — the WebGL view of every live claim, coloured by verification state — is
+  still here: <a class="act" href="/technical/cockpit">open it</a>. The six main pages do not need it, which
+  is why it moved.</p>
+{% endblock %}

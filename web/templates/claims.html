@@ -1,19 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Claims{% endblock %}
-{% block body %}
-<h1>Claims</h1>
-<p class="sub">Every fact the twin holds, with the verbatim span that justifies it. A claim whose quote
-  cannot be found in its own source is not a claim — and the header counts exactly those.</p>
-<form class="inline" method="get">
-  <input name="q" value="{{ q }}" placeholder="subject, predicate or quoted text" size="34"
-         data-live-filter="#claimtable" aria-label="filter these rows as you type">
-  <select name="state">
-    {% for s in ('open','history','all') %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}
-  </select>
-  <button>filter</button>
-  <span class="mini">{{ rows | length }} row(s)</span>
-</form>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">the ledger · {{ rows | length }} row(s) shown</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Every fact,<br>with its <em>alibi</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Every fact the twin holds, with the verbatim span that
+        justifies it. A claim whose quote cannot be found in its own source is not a claim — and the header
+        counts exactly those, recomputed per request.</p>
+      <form class="inline" method="get" style="margin-top:26px" role="search">
+        <input name="q" value="{{ q }}" placeholder="subject, predicate or quoted text" size="34"
+               data-live-filter="#claimtable" aria-label="filter these rows as you type">
+        <select name="state" aria-label="which states to show">
+          {% for s in ('open','history','all') %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}
+        </select>
+        <button>filter</button>
+        <span class="mini">{{ rows | length }} row(s)</span>
+      </form>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">The filter is a filter, not a verdict.</p>
+      <p class="mini" style="margin-top:10px">Clearing the search box returns every row, including retired
+        ones. Nothing is deleted to make a screen look clean; a retired claim is still in the table with
+        <code>valid_to</code> set.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
 
+{% block body %}
+<div class="ledger-wrap" data-reveal>
 <table id="claimtable">
 <thead><tr><th>#</th><th>subject / predicate</th><th>value</th><th>state</th><th>method</th>
   <th>provenance</th><th>verbatim evidence</th></tr></thead>
@@ -32,7 +49,7 @@
       ({{ r.orig_kind or '?' }}) · auth {{ r.authority if r.authority is defined else '—' }}</div>
     <div>{{ r.provider or 'rules' }}{% if r.model %} / {{ r.model }}{% endif %} ·
       {{ r.validation_status or '—' }}</div>
-    {% if r.checks_passed %}<div class="mini" style="color:#7ee787">✓ {{ r.checks_passed }}</div>{% endif %}
+    {% if r.checks_passed %}<div class="mini" style="color:var(--hi)">✓ {{ r.checks_passed }}</div>{% endif %}
   </td>
   <td style="max-width:44ch"><div class="quote">{{ r.evidence_span[:400] }}</div>
     <div class="mini">offset {{ r.char_start }}–{{ r.char_end }}
@@ -43,4 +60,5 @@
 <tr data-empty="1"><td colspan="7" class="mini">No rows. That is a filter, not a verdict.</td></tr>
 {% endfor %}
 </tbody></table>
+</div>
 {% endblock %}

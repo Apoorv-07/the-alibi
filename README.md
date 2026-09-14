@@ -26,7 +26,7 @@ make dev                             # diagnoses the environment, seeds the demo
 Open <http://localhost:8000>. Then, anywhere:
 
 ```bash
-make verify                          # 147 tests + the probes + the HTTP smoke run, ~15s, no GPU, no key
+make verify                          # 194 tests + the probes + the HTTP smoke run, ~15s, no GPU, no key
 python3 -m alibi.cli status          # the same numbers the UI shows, from the same rows
 curl -s localhost:8000/api/health | python3 -m json.tool
 ```
@@ -37,10 +37,15 @@ Fresh-database numbers, produced by the last `make verify` on this machine:
 ALIBI · mode=rules_only local=regex-extractor-v1 cloud=off
   sources 6 · claims 18 · grounded 18 · in review 0 · superseded 0
   conflicts open 3 · reviews 3 · actions pending 0
-  model calls 32 (local 32, cloud 0, 0 bytes out) · invalid outputs 0
-  FALSE TRUST: 0 / 18 grounded = 0.00%   (unverifiable: 0)
-  tasks tracked 10 · 31 change(s): 18×new requirement, 8×feasibility status changed, 3×date changed
+  model calls 33 (local 33, cloud 0, 0 bytes out) · invalid outputs 0
+  18 of 18 facts re-checked on read · nothing wrongly trusted   (unverifiable: 0)
+  tasks tracked 10 · 30 change(s): 18×new requirement, 8×feasibility status changed, 3×date changed
 ```
+
+That fourth line is the same sentence Home shows, because `alibi.cli status` and the UI call one function for
+it (`present.trust_words`). On a cold ledger neither of them prints `0 / 0 = 0.00%`; both print *"Nothing has
+been read yet, so there is nothing to verify — ALIBI does not fill this in."* The raw counters stay available
+at `/metrics` and `/api/health` for scripts that want numbers, not prose.
 
 The corpus contains three instruction-shaped passages: one (a forged “circular” inside the chat export) is
 quarantined as a block and never becomes a row; the other two are *legitimate* prose that merely contains
@@ -86,7 +91,7 @@ is derived from the address (`is_loopback`), so `http://192.168.1.9:1234/v1` is 
 
 ```mermaid
 flowchart TD
-    U["Student<br/>(browser, 17 pages)"] --> S["FastAPI · alibi/server.py<br/>Jinja + inline SVG, no build step"]
+    U["Student<br/>(browser: 6 calm pages · 16 technical)"] --> S["FastAPI · alibi/server.py<br/>Jinja + inline SVG, no build step"]
     S --> T["Twin service · alibi/twin.py<br/>ingest → verify → promote → supersede → change → solve"]
     T --> I["Ingest · alibi/ingest.py + taskfacts.py<br/>WhatsApp · ICS · ERP · syllabus · notice photo"]
     I -.->|propose spans only| M["LM Studio (loopback)<br/>alibi/providers.py: LocalChat<br/>Ollama / llama.cpp also work"]
@@ -115,7 +120,42 @@ Nothing in the dashed box can write to the ledger directly: `verify_claim` is th
 | `alibi/providers.py` | LM Studio / Ollama / cloud escalation, redaction, budget, `is_loopback` |
 | `alibi/actions.py` | the gate (deny list outranks the policy), drafts, approvals |
 | `alibi/twin.py` | the service that composes all of it; the CLI and the web app call the same object |
-| `alibi/server.py` | 33 routes (20 pages + 13 `/api`), the health probes, the SVG graph |
+| `alibi/server.py` | 45 routes — the six calm destinations, the 16 technical surfaces, `/api` reads and decisions, the health probes, the SVG graph |
+| `alibi/present.py` | **the only module allowed to turn state into sentences** — the language contract behind the six calm pages, tested in `tests/test_renovation.py` |
+
+## The interface: a command centre, not a dashboard
+
+Six destinations, one of which answers "what matters now" and none of which is a grid of panels:
+
+| | |
+|---|---|
+| **Home** `/` | the count in words ("7 things need you"), what is due, the plan verdict, what changed, one line on why to trust it |
+| **Calendar** `/calendar` | month grid + agenda, only dates a source states; a day with nothing on it is left empty |
+| **Tasks** `/tasks` | every obligation with its effort (learned, or labelled *assumed*), its weight, its receipts |
+| **Review** `/review` | the questions only a human can answer — two dates, a superseded fact — one decision per card |
+| **Evidence** `/evidence` | claim → the exact words → offsets → verification, searchable and per-subject |
+| **Settings** `/settings` | model routing, retention, the fluid-layer veto, and the door to Advanced |
+
+The eleven technical surfaces did not move out of the product, they moved out of the way: `/technical` groups
+them (claims, lineage, subject graph, review queue, conflicts, solver, risk, evaluation, data routing, audit,
+docs, the cockpit's field of facts) and every old URL still resolves. `/settings` keeps its full form surface.
+
+Three rules the code is obliged to keep:
+
+* **Progressive disclosure, four layers, never more than one open**: headline → what ALIBI thinks → *why* (a
+  `<details>` with sources, claim count and the raw ISO date) → the receipts, one link away.
+* **Absence is shown as absence.** A cold database says *"Nothing has been read yet, so there is nothing to
+  verify — ALIBI does not fill this in"* rather than rendering `0 of 0`, and `/` redirects to `/onboard`
+  because it has no answer to the one question it exists to answer.
+* **A card never picks a date for you.** Two dates on file means `due=None` plus "Two dates on file — you
+  choose", ordering on the earliest, and a link into Review.
+
+`alibi/present.py` is the only place internal state may become a sentence ("Ia 2" is `IA 2`,
+`2026-08-28` is `Was due Fri 28 Aug · 17 days ago`, `ai: degraded` is *"No language model is running, so the
+deterministic reader did the extraction"*); templates render what it returns and never re-derive meaning. The
+cinematic layer (WebGL atmosphere, inertial scroll, cursor, the field of facts) is now the technical pages'
+only, and the reader can veto it from Settings for the whole browser. `docs/UI-DESIGN.md` is the contract;
+`tests/test_renovation.py` and `node .tools/verify-fluid.mjs` are what keep it honest.
 
 ## What it is, in four mechanisms
 
@@ -146,7 +186,7 @@ Nothing in the dashed box can write to the ledger directly: `verify_claim` is th
 | `docs/THREAT-MODEL.md` | 12 threats incl. prompt injection via ingested content, with code refs and results |
 | `docs/CONFIGURATION.md` | every env var the code reads, routing, LM Studio, redaction, failure modes |
 | `docs/API-REFERENCE.md` | all 33 routes, the error contract, why a draft 404/409s instead of guessing |
-| `docs/UI-DESIGN.md` | two layers, one truth: what is server-rendered and what is enhancement |
+| `docs/UI-DESIGN.md` | the calm layer and the fluid layer, the six destinations, the language contract in `present.py`, the reader's veto over motion, and the cascade-order trap that ate a tablet nav |
 | `docs/DEPLOYMENT.md` | laptop, LM Studio, container, air-gapped, systemd; retention, backup, rollout order |
 | `docs/DEMO-WALKTHROUGH.md` | a 12-minute live script: startup, verification, 10 steps, failure demos, teardown |
 | `EVAL_REPORT.md` | the four-variant table, generated — `/eval` renders this file, never a copy |
@@ -155,8 +195,9 @@ Nothing in the dashed box can write to the ledger directly: `verify_claim` is th
 ## The rest of the surface
 
 ```bash
-make test          # 147 tests (~6s)
-make smoke         # boots on an EMPTY db, seeds, renders all 17 pages, /static/*, traversal, the manual-answer loop
+make test          # 194 tests (~10s), incl. tests/test_renovation.py: the six destinations + the language contract
+make smoke         # boots on an EMPTY db, seeds, renders all 24 pages (200, or 302→/onboard when cold), /static/*, traversal, the manual-answer loop
+make browser-check   # 99 checks in Chromium across both design systems (`make browser` installs what it needs, once): the fluid layer paints, the calm pages carry no canvas/cursor/inertia at 4 viewports, both sync round trips report in one sentence
 make checks        # focused probes: verifier edges, attribution, scenario calibration
 make eval          # regenerate EVAL_REPORT.{md,json} (zero model calls needed)
 make serve | seed | retention | docker | docker-llm | lint | clean
@@ -183,7 +224,7 @@ python3 -m alibi.cli {status|sync|ingest FILE|why TASK|conflicts|plan [--draft]|
 | A human answer becomes a claim with its own receipt, or is refused | `test_use_my_answer_becomes_a_claim_not_only_a_closed_inbox_item` |
 | Nothing is ever sent | `test_an_approved_draft_is_rendered_not_sent_and_cannot_be_decided_twice` |
 | Wipe is a verified DELETE; retention reports what it cost | `test_wipe_requires_the_keyword_and_reports_the_real_counts`, `test_retention_drops_text_and_reports_the_loss_rather_than_hiding_it` |
-| LM Studio's documented URL works, and every failure mode is a value not a crash | 5 tests in `tests/test_providers_and_time.py` against a real local HTTP server |
+| LM Studio's documented URL works, and every failure mode is a value not a crash | 45 tests in `tests/test_providers_and_time.py` against a real local HTTP server |
 | The page is correct with no CSS/JS, and the client layer has no HTML-injection surface | `test_the_page_works_with_and_without_the_enhancement_layer` |
 | The docs page is not a file-read primitive | `test_docs_route_cannot_be_turned_into_a_file_reader` + smoke's traversal → 404 |
 
@@ -200,6 +241,10 @@ python3 -m alibi.cli {status|sync|ingest FILE|why TASK|conflicts|plan [--draft]|
 | `INFEASIBLE`, `slack_hours=-3.0` on a past date | also correct — a deadline at/before the horizon start has no legal time left, and "no submission on file" is not a verdict about you |
 | `unverifiable` climbing | the retention job ran; quotes survive, documents do not. `python3 -m alibi.cli retention --days N` |
 | a `500` on any page | a template bug, not a data bug — run `python3 scripts/smoke.py`, which names the page |
+| `/` redirects you to `/onboard` | correct on an empty ledger: Home answers "what matters now" and has nothing to answer with. Load the sample corpus from that page, or `make seed`; `/?demo=1` skips the redirect |
+| the calm pages feel flat, no glow, no parallax | that is the design: the fluid layer belongs to the technical pages. It is there on `/technical/cockpit` — if it is missing there too, `localStorage` has `alibi.fluid.off=1` (Settings → Reading preferences turns it back on) or your OS asks for reduced motion |
+| the mobile nav bar shows two rows, or overlaps content | a CSS regression: the bar must be one horizontally-scrollable row. `node .tools/verify-fluid.mjs` measures its height and tap targets at 390px |
+| a `calm.css` rule appears not to apply | check the emission order in `base.html`, not the selector: layer 1 (inline) must come **before** the `<link>`, or the fallback silently wins on source order |
 | a broken/migrated-sideways database | the recovery is `rm alibi.db && make seed` *because* the ledger is derived from a corpus in this repo; on a real installation, restore the file (see `docs/DEPLOYMENT.md`) |
 | port already in use | `PORT=8080 make dev`; the container maps `8000:8000` and `docker compose down` releases it |
 

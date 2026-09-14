@@ -46,10 +46,121 @@ def test_every_page_renders_on_an_empty_database(client):
     import sys
     sys.path.insert(0, str(ROOT / "scripts"))
     from smoke import PAGES as pages                      # the same list the harness walks
-    bad = [p for p in pages if c.get(p).status_code != 200]
+    # `/` answers a *question*, and with nothing ingested it has no answer to give: it redirects to the
+    # onboarding screen. That is a 302 by design, not a failure — everything else must render 200 cold.
+    bad = [p for p in pages if c.get(p).status_code not in (200, 302)]
     assert not bad, f"empty-DB 500s: {bad}"
+    r = c.get("/", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/onboard", \
+        "an empty ledger must lead a first-time student to onboarding, not to an empty dashboard"
+    assert c.get("/onboard").status_code == 200
     assert c.get("/healthz").status_code == 200
     assert c.get("/readyz").status_code == 503, "ops endpoints are not pages; cold readiness must be 503"
+
+
+def test_the_seed_script_runs_on_the_interpreter_that_can_import_the_product(tmp_path):
+    """`make seed` used to shell out to a bare `python3` while the venv held the dependencies: every block
+    printed `promoted=0`, the solver raised ModuleNotFoundError, and the target exited nonzero. A one-command
+    setup step that half-runs is the worst kind of first impression, so the script's own contract is pinned:
+    it picks a working interpreter, and a fresh database ends up populated."""
+    import re
+    import subprocess
+
+    root = ROOT                      # the repo, already resolved at the top of this module
+    db = tmp_path / "seeded.db"
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "ALIBI_DB": str(db)}
+    venv = root / ".venv" / "bin" / "python"
+    if venv.exists():
+        env["ALIBI_PY"] = str(venv)
+    r = subprocess.run(["sh", "scripts/seed.sh"], cwd=str(root), env=env,
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stdout[-400:] + r.stderr[-400:]
+    out = r.stdout + r.stderr
+    promoted = [int(m) for m in re.findall(r"promoted=(\d+)", out)]
+    assert promoted and sum(promoted) > 0, f"a seed that promotes nothing is not a seed: {out[-400:]}"
+    assert "ModuleNotFoundError" not in out, out[-300:]
+    assert "sources 6" in out and "nothing wrongly trusted" in out, out[-400:]
+    # and it must be idempotent, which is what the page's Sync button relies on
+    r2 = subprocess.run(["sh", "scripts/seed.sh"], cwd=str(root), env=env,
+                        capture_output=True, text=True, timeout=180)
+    assert r2.returncode == 0, r2.stdout[-300:] + r2.stderr[-300:]
+    assert "claims 18" in r2.stdout, "the second seed must add nothing, not double the ledger"
+
+
+def test_a_review_verb_survives_a_submit_that_carries_no_button_value(client):
+    """The Review sheet used to encode its verb in the submit button's `value`, so any submit that was not a
+    literal click on that button (a scripted `form.requestSubmit()`, an a11y tool, a browser quirk) posted no
+    `decision` at all and was answered 422 "Field required" for a field the student never saw. Two changes,
+    both pinned: the verb is a hidden input the HTML always sends, and the route treats `use` as the default
+    rather than a demanded field."""
+    c, state = client
+    c.post("/api/sync", data={"demo": "true"})
+    html = c.get("/review").text
+    assert 'name="decision" value="use"' in html, "the primary verb must be a hidden field, not a button value"
+    assert 'name="decision" value="later"' in html, "the secondary verb needs its own form (a form cannot nest)"
+    assert 'form="defer-' in html, "and its button must be bound to that form by attribute"
+
+    rid = state.twin.db.one("SELECT id FROM review_item WHERE status='open' ORDER BY id")["id"]
+    r = c.post(f"/api/review/{rid}/resolve", data={"chosen_index": "1", "note": "no decision field at all"})
+    assert r.status_code == 200, r.text
+    assert r.json()["decision"] == "approved", r.json()
+
+
+def test_the_calendar_export_is_a_real_ics_file_not_a_500(client):
+    """`/api/export/twin.ics` is linked from the sidebar of every page and had never been rendered by a test:
+    the exporter read `e["date"]`/`e["title"]` while its only caller built `summary`/`dtstart`, so the link was
+    a `KeyError` dressed as a download. Pinned here because a file a student imports into a real calendar
+    either parses or it does not — an unescaped comma in an assignment title breaks the import silently."""
+    c, _ = client
+    c.post("/api/sync", data={"demo": "true"})
+    r = c.get("/api/export/twin.ics")
+    assert r.status_code == 200, r.text[:400]
+    assert r.headers["content-type"].startswith("text/calendar"), r.headers
+    body = r.text
+    assert body.startswith("BEGIN:VCALENDAR") and body.rstrip().endswith("END:VCALENDAR")
+    assert "\r\n" in body, "RFC5545 requires CRLF line endings; a bare \n file is refused by some clients"
+    n = body.count("BEGIN:VEVENT")
+    assert n >= 5, f"the demo corpus has 10 dated obligations, the export had {n}"
+    assert body.count("DTSTART;VALUE=DATE:") == n == body.count("END:VEVENT")
+    # the human phrase, not the primary key, and no raw JSON anywhere
+    assert "SUMMARY:IA 2" in body and "SUMMARY:dbms-ia_2" not in body
+    assert "{" not in body.split("BEGIN:VEVENT")[1][:400], "a value dict leaked into a SUMMARY"
+    for esc_char in (";", ","):
+        assert f"\\{esc_char}" in body, f"RFC5545 escaping missing for {esc_char!r}"
+    assert "CATEGORIES:" in body and "DESCRIPTION:" in body, "no course and no provenance in the import"
+
+
+# ---------------------------------------------------------------- internal links ---
+
+def test_no_page_links_to_a_route_that_does_not_exist(client):
+    """A dead href is the quietest bug a product can ship: nothing errors, nothing fails a render check, the
+    user just clicks and gets a 404. `/twin` shipped exactly this — its "raw graph view" link pointed at
+    `/api/lineage/<type>/<id>`, a route nobody ever wrote, while `db.lineage()` built the string.
+
+    So: crawl the same page list the smoke harness walks, take every internal link, and require each to
+    resolve. Query strings are kept (they are how `?task=` pages find their subject) and static/export
+    suffixes are skipped because they are files, not routes.
+    """
+    import re
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from smoke import PAGES as pages
+
+    c, _ = client
+    c.post("/api/sync", data={"demo": "true"})
+    dead, seen = [], set()
+    for page in pages:
+        html = c.get(page).text
+        for href in set(re.findall(r'href="(/[^"#?]*)(?:\?[^"]*)?"', html)):
+            if href.startswith(("/static/", "/docs/")) or re.search(r"\.(css|js|png|ico|svg)$", href):
+                continue
+            if (page, href) in seen:
+                continue
+            seen.add((page, href))
+            code = c.get(href, follow_redirects=False).status_code
+            if code not in (200, 302, 303, 307):
+                dead.append(f"{page} → {href} ({code})")
+    assert not dead, "dead in-page links: " + "; ".join(dead[:12])
 
 
 # ------------------------------------------------------------------- uploads ---
@@ -351,6 +462,142 @@ def test_use_my_answer_becomes_a_claim_not_only_a_closed_inbox_item(client):
     assert st["false_trust_count"] == 0, "an answer is not a licence to break the receipt rule"
 
 
+def test_a_candidate_is_chosen_by_index_because_json_will_not_survive_an_attribute(client):
+    """The queue used to put an option's JSON straight into `<input value="{{ o | tojson }}">`. This template
+    renders without auto-escaping, so `|tojson` emits real `"` characters there: the attribute ended where the
+    JSON began, the server received half a value, and the ledger stored the half it got — silently wrong,
+    because nothing on the Python side could tell. Options are therefore addressed by *index*, resolved
+    against the row the server already trusts, and the rendered pages are checked for the same class of break
+    wherever a value is interpolated."""
+    import json
+    import re
+
+    c, state = client
+    opts = [{"label": '{"date": "2026-11-02", "precision": "day"}', "consequence": "planned against this",
+             "value": {"date": "2026-11-02", "precision": "day"}},
+            {"label": '{"date": "2026-11-09", "precision": "day"}', "consequence": "one week later",
+             "value": {"date": "2026-11-09", "precision": "day"}}]
+    rid, opened = state.twin.db.open_review(
+        question="Which date is the real deadline for the report?", kind="CONFLICTING_STATEMENTS",
+        why="two sources, both quoted", subject_id="fluid-probe_1", options=opts)
+    assert opened and rid
+
+    page = c.get("/queue").text
+    assert 'name="chosen_index"' in page, "the queue must post the index, not the payload"
+    for m in re.finditer(r'(?:value|href|data-[a-z-]+)="([^"]*)"', page):
+        assert not (m.group(1).startswith("{") or (m.group(1).count('"') and False)), m.group(0)[:80]
+
+    r = c.post(f"/api/review/{rid}/resolve",
+               data={"decision": "approve", "chosen_index": "1", "note": "the later date is the resubmission window"})
+    assert r.status_code == 200, r.text
+    stored = json.loads(state.twin.db.one("SELECT resolution FROM review_item WHERE id=?", (rid,))["resolution"])
+    assert stored == opts[1], f"expected the second candidate verbatim, got {stored}"
+    assert json.dumps(stored).count('"date": "2026-11-09"') == 1 or stored["value"]["date"] == "2026-11-09"
+    row = state.twin.db.one("SELECT status, consequence FROM review_item WHERE id=?", (rid,))
+    assert row["status"] == "answered" and "resubmission" in row["consequence"]
+
+    bad = c.post(f"/api/review/{rid}/resolve", data={"decision": "approve", "chosen_index": "99"})
+    assert bad.status_code == 422 and "index 99" in bad.json()["detail"], bad.text
+
+    # an out-of-range index on an already-answered item must not rewrite history either
+    assert json.loads(state.twin.db.one("SELECT resolution FROM review_item WHERE id=?",
+                                       (rid,))["resolution"]) == opts[1]
+
+    # accept_safety decodes its payload instead of storing a form string
+    rid2, _ = state.twin.db.open_review(question="Which hall is the viva in?", kind="CONFLICTING_STATEMENTS",
+                                        subject_id="fluid-probe_2", options=[])
+    r3 = c.post(f"/api/review/{rid2}/resolve",
+                data={"decision": "accept_safety", "chosen": json.dumps({"venue": "CR-204"})})
+    assert r3.status_code == 200, r3.text
+    assert json.loads(state.twin.db.one("SELECT resolution FROM review_item WHERE id=?",
+                                       (rid2,))["resolution"]) == {"venue": "CR-204"}
+    r4 = c.post(f"/api/review/{rid2}/resolve", data={"decision": "accept_safety", "chosen": "not json at all"})
+    assert r4.status_code == 422 and "must be JSON" in r4.json()["detail"], r4.text
+
+
+def test_every_figure_div_in_a_hero_is_closed_and_sibling_shaped(client):
+    """`_stat()` emits an opening `<div>` plus its children; for a while it never closed them.
+
+    HTML error recovery then nested each figure inside the previous one — the cockpit hero's lead figure grew
+    to 1217 px and swallowed the meta row as a grandchild. No status-code test can see that; a shape test can.
+    Every page that renders a hero is checked for balanced div/span tags and for figures that are siblings.
+    """
+    import re
+
+    c, _ = client
+    c.post("/api/sync", data={"demo": "true"})
+    seen = 0
+    for path in ("/", "/claims", "/queue", "/conflicts", "/twin", "/feasibility", "/risk", "/eval", "/docs"):
+        html = c.get(path).text
+        seen += html.count('class="stat figure')
+        opens, closes = len(re.findall(r"<div\b", html)), len(re.findall(r"</div>", html))
+        assert opens == closes, f"{path}: {opens} <div> vs {closes} </div> — a helper is leaking an element"
+        so, sc = len(re.findall(r"<span\b", html)), len(re.findall(r"</span>", html))
+        assert so == sc, f"{path}: {so} <span> vs {sc} </span>"
+        # a figure must not contain another figure: nesting is exactly the bug this test exists for
+        nested = re.findall(r'<div class="stat figure[^"]*"[^>]*>(?:(?!</div>).)*<div class="stat figure', html, re.S)
+        assert not nested, f"{path}: a figure is nested inside another figure ({len(nested)} case(s))"
+    assert seen >= 8, f"only {seen} figures rendered across all pages — the check would be vacuous"
+
+
+def test_the_fluid_layer_is_local_opt_in_and_never_carries_data(client):
+    """The fluid visual layer (inertia scroll, the WebGL atmosphere, the field of facts, the cursor) is an
+    enhancement and has to stay one: four files served by this process, nothing from a CDN, no inline event
+    handlers, and — the part that matters for a trust product — no number on any page produced by it. If
+    `motion.js` is ever accused of lying about a deadline, the answer must be that it cannot."""
+    c, state = client
+    c.post("/api/sync", data={"demo": "true"})
+    # The renovation moved the fluid layer: the six human pages load `calm.css`/`calm.js` and nothing else, so
+    # "the layer is an enhancement" is a claim about the *technical* pages. Assert it where the layer lives —
+    # an assertion that passes because the page no longer has a canvas is not an assertion at all.
+    html = c.get("/technical/cockpit").text
+    for asset in ("alibi.css", "motion.js", "atmosphere.js", "scene.js", "alibi.js"):
+        assert f"/static/{asset}?v=" in html, f"{asset} is not linked from the page"
+        r = c.get(f"/static/{asset}")
+        assert r.status_code == 200 and len(r.text) > 400, f"{asset} is not served"
+
+    # the shader lives in the file, not behind a fetch: one blocked request cannot blank the atmosphere
+    frag = c.get("/static/atmosphere.js").text
+    assert "#version 300 es" in frag and "fbm(" in frag, "the atmosphere's GLSL is not inline"
+    assert "uVel" in frag and "uProg" in frag, "the field must read scroll velocity, not only position"
+    assert "reduced" in c.get("/static/motion.js").text, "motion must honour prefers-reduced-motion"
+    scene_js = c.get("/static/scene.js").text
+    assert "drawArraysInstanced" in scene_js and "uGround" in scene_js
+
+    # what the field draws is the ledger's own data — same rows, same destinations, no retired claims
+    import json
+    import re
+    m = re.search(r'<script id="scene-data" type="application/json">(.*?)</script>', html, re.S)
+    assert m, "the field of facts has no data block, so the canvas would silently render nothing"
+    payload = json.loads(m.group(1))
+    stats = state.twin.db.stats()
+    live = {r["id"] for r in state.twin.db.open_claims()}
+    ids = {n["id"] for n in payload["claims"]}
+    assert ids and ids <= live, "the canvas drew a retired or invented claim"
+    assert payload["stats"]["rows"] == stats["claims"], "the legend must count the same rows the header does"
+    for n in payload["claims"]:
+        assert n["u"] == f"/claims#c{n['id']}", "a dot must land on the row the table shows"
+        assert n["k"] in ("grounded", "review", "conflict"), n
+    counts = {k: sum(1 for n in payload["claims"] if n["k"] == k) for k in ("grounded", "review", "conflict")}
+    assert counts["conflict"] == 0 or stats["conflicts"], "conflict dots with no conflict rows is a lie"
+
+    # the layer is decoration to assistive tech, and the page never depends on it for the truth
+    assert 'aria-hidden="true"' in html and 'role="presentation"' in html
+    assert "onclick=" not in html, "an inline handler snuck into a page"
+    stripped = re.sub(r"<[^>]+>", " ", html)
+    for needle in ("false trust", "grounded claims", "System health"):
+        assert needle in stripped, f"{needle} must be in the HTML, not produced by the environment"
+    assert state.twin.db.stats()["false_trust_count"] == 0
+    # ...and the reader can turn it off without the app noticing: the veto is in the three scripts that start
+    # the loops, and the calm pages never load them at all.
+    for asset in ("motion.js", "atmosphere.js", "scene.js"):
+        assert "alibi.fluid.off" in c.get(f"/static/{asset}").text, f"{asset} ignores the reader's veto"
+    calm = c.get("/").text
+    for asset in ("motion.js", "atmosphere.js", "scene.js"):
+        assert f"/static/{asset}" not in calm, f"the calm home page still loads {asset}"
+    assert "/static/calm.css?v=" in calm and "/static/calm.js?v=" in calm
+
+
 def test_an_ambiguous_answer_is_asked_again_instead_of_resolved_by_sorting(client):
     c, state = client
     c.post("/api/sync", data={"demo": "true"})
@@ -401,29 +648,37 @@ def test_readyz_names_the_ai_runtime_and_says_when_it_is_only_the_simulator(clie
 # ---------------------------------------------------------------- enhancement ---
 
 def test_the_page_works_with_and_without_the_enhancement_layer(client):
-    """Layer 2 (CSS/JS) is served from this process, never a CDN, and the page must be *correct*
-    without it: a campus network that blocks an asset must degrade the look, not the truth. The test
-    asserts both halves — that the link exists when the files exist, and that nothing in the rendered
-    HTML depends on them."""
+    """Layer 2 (CSS/JS) is served from this process, never a CDN, on *both* design systems, and a page must
+    be correct without it: a campus network that blocks an asset may degrade the look, never the truth. The
+    renovation doubled this requirement — a calm page has its own one-file layer — so the test checks the
+    pair that belongs to each, and that neither page fetches anything off-box."""
     c, state = client
-    html = c.get("/").text
-    assert "/static/alibi.css?v=" in html and "/static/alibi.js?v=" in html
-    assert c.get("/static/alibi.css").status_code == 200
-    assert c.get("/static/alibi.js").status_code == 200
-    # the inline layer still carries the design tokens, so a 404 on the file is a plain page, not a broken one
-    assert "--panel" in html and "class=\"shell\"" in html
-    # no external origin anywhere: the only asset URLs are relative
     import re
-    ext = [u for u in re.findall(r'(?:href|src)="([^"]+)"', html) if u.startswith(("http:", "https:", "//"))]
-    assert not ext, f"external asset on a trust dashboard: {ext}"
-    # and every page's numbers are in the HTML, not fetched by JS
-    body = re.sub(r"<[^>]+>", " ", html)
-    assert "false trust" in body and "grounded claims" in body, \
-        "the two numbers the product is judged on must be in the HTML, not fetched by JS"
-    js = c.get("/static/alibi.js").text
-    for banned in ("innerHTML =", "eval(", "document.write", "insertAdjacentHTML"):
-        assert banned not in js, f"{banned} in the client layer — an XSS surface for no benefit"
-    assert "fetch(" in js, "the toast layer should be the thing that reads API errors"
+    # read the cold state *before* warming anything: `/` has no answer to give with an empty ledger, so it
+    # hands the reader to /onboard, and the sentence that page owes them is "there is nothing here yet" —
+    # not a row of zeroes pretending to be a measurement.
+    cold = re.sub(r"<[^>]+>", " ", c.get("/").text)      # TestClient follows the redirect for us
+    assert "ALIBI does not fill this in" in cold, "a cold home page must state what is absent, in words"
+    assert "verified" not in cold, "no claims means no 'verified' figures on the page"
+    c.post("/api/sync", data={"demo": "true"})           # a cold DB redirects `/` to /onboard; the layers must
+    for path, css, js in (("/technical/cockpit", "alibi.css", "alibi.js"), ("/", "calm.css", "calm.js")):
+        html = c.get(path).text
+        assert f"/static/{css}?v=" in html and f"/static/{js}?v=" in html, f"{path} lost its layer"
+        assert c.get(f"/static/{css}").status_code == 200
+        assert c.get(f"/static/{js}").status_code == 200
+        # the inline layer still carries the design tokens, so a 404 on the file is a plain page, not a broken one
+        assert "--panel" in html or "--c-accent" in html, f"{path} has no inline tokens"
+        assert 'class="shell"' in html, f"{path} lost the shell that layer 1 lays out"
+        ext = [u for u in re.findall(r'(?:href|src)="([^"]+)"', html) if u.startswith(("http:", "https:", "//"))]
+        assert not ext, f"external asset on a trust dashboard ({path}): {ext}"
+    # and every page's numbers are in the HTML, not fetched by JS.
+    warm = re.sub(r"<[^>]+>", " ", c.get("/").text)
+    assert "re-checked on read" in warm, "the trust sentence must be in the HTML, not fetched by JS"
+    for asset in ("alibi.js", "calm.js"):
+        js = c.get(f"/static/{asset}").text
+        for banned in ("innerHTML =", "eval(", "document.write", "insertAdjacentHTML"):
+            assert banned not in js, f"{banned} in {asset} — an XSS surface for no benefit"
+    assert "fetch(" in c.get("/static/alibi.js").text, "the toast layer should be the thing that reads API errors"
 
 
 def test_ai_health_is_reported_as_a_component_not_a_green_dot(client):
@@ -441,8 +696,15 @@ def test_ai_health_is_reported_as_a_component_not_a_green_dot(client):
     assert any("empty" in w or "simulator" in w for w in j["warnings"]), j
     # and the paths it prints are the paths actually open, not the config default
     assert j["components"]["database"]["detail"].endswith("api.db") or "api.db" in j["components"]["database"]["detail"], j
-    # the cockpit shows the same verdicts the API reports, and says where they came from
-    page = c.get("/").text
+    # the home page says it in a sentence, and the cockpit still shows the per-component readouts: both
+    # pages must agree with the API, because a "degraded" that reads healthy somewhere is a bug either way
+    import re as _re
+    c.post("/api/sync", data={"demo": "true"})
+    calm = _re.sub(r"<[^>]+>", " ", c.get("/").text)
+    assert "No language model is running" in calm, \
+        "the home page must translate `ai: degraded` into what it means for the student"
+    assert "/api/health" in c.get("/").text, "a status line you cannot inspect is decoration"
+    page = c.get("/technical/cockpit").text
     assert "System health" in page and "AI: degraded" in page, page[:200]
     assert "/api/health" in page, "a dashboard chip you cannot inspect is decoration"
 

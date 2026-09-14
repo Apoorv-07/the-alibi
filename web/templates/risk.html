@@ -1,12 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Risk{% endblock %}
-{% block body %}
-<h1>Risk</h1>
-<p class="sub">Two kinds of bad news, kept in separate columns for the whole design: what is
-  <b>proven</b> (a solver exhausted the possibilities) and what is <b>forecast</b> (a model projects a
-  breach). A forecast never borrows the certainty of a proof, and a proof never gets a percentage.</p>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">{{ rows | length }} forecast row(s) · proven and predicted, in separate columns</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Proven is not<br><em>probable</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Two kinds of bad news, kept apart for the whole design: what is <b>proven</b> (a solver exhausted the possibilities) and what is <b>forecast</b> (a model projects a breach). A forecast never borrows the certainty of a proof, and a proof never gets a percentage.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">A gauge that reads 62% on day one of a term is a lie with good typography.</p>
+      <p class="mini" style="margin-top:10px">When the attendance denominator is not on record, or there is no history to calibrate against, the model returns PENDING with the reason — and this page shows the reason instead of a number.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
 
-<div class="grid g4" style="margin-bottom:12px">
+{% block body %}
+
+<div class="hero-figures" style="margin-bottom:8px">
   {% set proven = rows | selectattr('status','eq','PROVEN_INFEASIBLE') | list %}
   {% set atrisk = rows | selectattr('status','eq','AT_RISK') | list %}
   {% set pend = rows | selectattr('status','eq','PENDING') | list %}

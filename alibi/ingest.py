@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 # --------------------------------------------------------------- detection ---
 
@@ -251,24 +251,40 @@ def _iso(v: str | None) -> str | None:
 def build_ics(events: list[dict], prodid: str = "-//Alibi//Twin//EN", tzid: str = "Asia/Kolkata") -> str:
     """Deterministic calendar *proposal*. Escaping per RFC5545 §3.3.11: ';' ',' '\\' and
     newlines — a missed comma in an assignment title is a broken import, and students
-    notice that instantly."""
+    notice that instantly.
+
+    The event contract is one dict per entry: `date` (YYYY-MM-DD, required), `title` (shown as SUMMARY),
+    `uid`, `description`, `course`, `alarm_min`. It used to read `title`/`date` while the only caller built
+    `summary`/`dtstart` — which meant `GET /api/export/twin.ics`, the link on the sidebar of every page,
+    raised `KeyError: 'date'`. That is the shape of bug a "helper takes a dict" interface hides, so the keys
+    are now read through one place (`when()`) and the caller was fixed too.
+    """
     def esc(s: str) -> str:
-        return (s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
-                 .replace("\n", "\\n"))
+        return (str(s).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+                .replace("\n", "\\n"))
+
+    def when(e: dict) -> str:
+        for key in ("date", "dtstart", "day"):
+            v = e.get(key)
+            if v:
+                return str(v)[:10].replace("-", "")
+        raise ValueError("an ICS event needs a date; ALIBI does not invent one to fill a calendar")
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")   # aware, and identical for the whole file
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:{prodid}", "CALSCALE:GREGORIAN",
              "METHOD:PUBLISH", f"X-WR-CALNAME:Alibi (twin)", f"X-WR-TIMEZONE:{tzid}"]
     for i, e in enumerate(events):
-        d = e["date"].replace("-", "")
-        lines += ["BEGIN:VEVENT", f"UID:alibi-{e.get('id', i)}@twin",
-                  f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
-                  f"DTSTART;VALUE=DATE:{d}", f"DTEND;VALUE=DATE:{d}",
-                  f"SUMMARY:{esc(e['title'])}"]
+        d = when(e)
+        title = e.get("title") or e.get("summary") or "Untitled obligation"
+        uid = e.get("uid") or f"alibi-{e.get('id', i)}@twin"
+        lines += ["BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{stamp}",
+                  f"DTSTART;VALUE=DATE:{d}", f"DTEND;VALUE=DATE:{d}", f"SUMMARY:{esc(title)}"]
         if e.get("description"):
             lines.append(f"DESCRIPTION:{esc(e['description'])[:700]}")
         lines.append(f"CATEGORIES:{esc(e.get('course', 'school'))}")
         if e.get("alarm_min"):
             lines += ["BEGIN:VALARM", "ACTION:DISPLAY",
-                      f"TRIGGER:-PT{int(e['alarm_min'])}M", f"DESCRIPTION:{esc(e['title'])}",
+                      f"TRIGGER:-PT{int(e['alarm_min'])}M", f"DESCRIPTION:{esc(title)}",
                       "END:VALARM"]
         lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")

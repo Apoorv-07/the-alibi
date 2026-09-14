@@ -1,159 +1,624 @@
-/* ALIBI — layer 2 of the design system.
+/* ALIBI · alibi.css — the fluid system. One design language, expressed as tokens, used by every page.
  *
- * Layer 1 lives inline in `web/templates/base.html` and is the whole product on its own: a request that
- * cannot load this file (offline, a hostile campus network, `curl`) renders identically apart from motion
- * and the enhancements in alibi.js. That split is the point. A trust dashboard whose layout depends on a
- * JS bundle is a dashboard that shows nothing exactly when something has gone wrong.
+ * Read this file as a contract, not as decoration:
  *
- * So: no framework, no build, no fonts from a CDN, no chart library. Everything here is CSS that either
- * deepens the surface, animates a state change, or styles a component the templates already emit.
+ *  §0  tokens        colour, elevation, material, motion durations. Nothing below invents a value.
+ *  §1  planes        the z-stack that makes a 2D screen read as space (atmosphere → field → content).
+ *  §2  materials     glass, veil, light, ink. Four, applied sparingly, never stacked on each other.
+ *  §3  type          a display voice for meaning, a reading voice for prose, monospace only for facts.
+ *  §4  objects       what used to be "panels": figures, rails, streams, ledgers, receipts.
+ *  §5  motion        entrance, state change, focus, selection. One easing family, four durations.
+ *  §6  degradation   reduced motion, no JS, no WebGL, print, 2 GB Chromebook, 320 px phone.
+ *
+ * Layer 1 (inline in base.html) still owns the *structure* and a readable page without this file. This
+ * file owns the *experience*. Deleting it must never delete a number.
  */
 
+/* ══════════════════════════════════════ §0 · tokens ══════════════════════════════════════ */
 :root {
-  --r-sm: 6px; --r: 10px; --r-lg: 14px;
-  --e1: 0 1px 0 rgba(255,255,255,.025), 0 8px 24px -14px rgba(0,0,0,.85);
-  --e2: 0 1px 0 rgba(255,255,255,.04), 0 20px 44px -20px rgba(0,0,0,.9);
-  --ease: cubic-bezier(.2,.7,.2,1);
-  --dur: .18s;
-  --glass: rgba(18,26,36,.72);
-}
+  /* atmosphere: an ink-blue night with real luminance separation, not pure black */
+  --void: #05070d;
+  --abyss: #080c16;
+  --body: #0b1120;
 
-/* ---- ambient depth: one radial wash, no images, no requests ---------------- */
+  /* material tints (translucent on purpose: the field has to read through them) */
+  --glass: rgba(152, 183, 235, .055);
+  --glass-2: rgba(152, 183, 235, .085);
+  --glass-solid: #0e1524;
+  --veil: rgba(6, 9, 16, .62);
+  --hair: rgba(163, 196, 240, .13);
+  --hair-strong: rgba(163, 196, 240, .24);
+  --panel: var(--glass-solid);
+  --panel2: #121a2b;
+  --line: rgba(163, 196, 240, .13);
+
+  /* ink */
+  --ink: #e8eefb;
+  --dim: #9fb0c9;
+  --faint: #7286a3;
+
+  /* three semantic accents, and nothing else */
+  --hi: #6ee7a8;          /* grounded, permitted, verified */
+  --warn: #ffc46b;        /* a human owes a decision */
+  --bad: #ff7b8a;         /* refused, proven impossible, false trust */
+  --info: #86b8ff;        /* observed, tracked */
+  --vio: #bfa6ff;         /* superseded, historical */
+
+  /* the field's palette — read by the shader at boot, so the theme owns the colour and GL owns the maths */
+  --fluid-a: #4c7fd6;
+  --fluid-b: #45d6a0;
+  --fluid-c: #7f5bd6;
+
+  /* spatial radii: generous, asymmetric where it means something */
+  --r-xs: 8px; --r-sm: 12px; --r: 18px; --r-lg: 26px; --r-xl: 38px; --r-blob: 46% 54% 42% 58% / 52% 46% 54% 48%;
+
+  /* elevation: light from above, so a raised object is brighter on top and softer below */
+  --lift-1: 0 1px 0 rgba(255, 255, 255, .05), 0 10px 26px -16px rgba(0, 0, 0, .9);
+  --lift-2: 0 1px 0 rgba(255, 255, 255, .07), 0 22px 54px -22px rgba(0, 0, 0, .95);
+  --lift-3: 0 1px 0 rgba(255, 255, 255, .09), 0 44px 90px -34px rgba(0, 0, 0, 1);
+  --inset-hair: inset 0 1px 0 rgba(255, 255, 255, .06), inset 0 -1px 0 rgba(0, 0, 0, .25);
+
+  /* the motion language: one easing family (a decelerating expo), four durations */
+  --e-out: cubic-bezier(.16, .84, .24, 1);
+  --e-in-out: cubic-bezier(.7, 0, .2, 1);
+  --e-spring: cubic-bezier(.2, 1.22, .32, 1);
+  --fast: 140ms; --mid: 340ms; --slow: 620ms; --cinema: 1200ms;
+
+  /* the values the JS writes; declared here so an unsupported browser still lays out correctly */
+  --sy: 0; --sv: 0; --px: .5; --py: .5; --prog: 0;
+  --fluid-blur: 34px;
+}
+html[data-fluid-quality="0"] { --fluid-blur: 0px; }
+
+/* ══════════════════════════════════════ §1 · planes ══════════════════════════════════════ */
+/* The fixed atmosphere and the orbs are deliberately larger than the viewport (they translate as the page
+   moves, and an edge-aligned gradient would show a seam). `clip` on the root keeps that overhang from
+   becoming a 120 px horizontal scrollbar — `clip`, not `hidden`, so the vertical scroll container and its
+   sticky elements keep working exactly as they did. */
+html { background: var(--void); scroll-behavior: auto; overflow-x: clip; }
 body {
+  /* the gradient under the canvas: this is what a no-WebGL or reduced-quality reader sees, and it is
+     enough. The shader is weather on top of a sky, not the sky. */
   background:
-    radial-gradient(900px 480px at 78% -10%, rgba(107,184,255,.06), transparent 60%),
-    radial-gradient(700px 420px at 8% 110%, rgba(126,231,135,.05), transparent 55%),
-    var(--bg);
-  background-attachment: fixed;
+    radial-gradient(120% 80% at 82% -12%, rgba(76, 127, 214, .20), transparent 58%),
+    radial-gradient(90% 70% at 6% 108%, rgba(69, 214, 160, .14), transparent 60%),
+    radial-gradient(70% 60% at 40% 30%, rgba(127, 91, 214, .10), transparent 65%),
+    linear-gradient(180deg, var(--abyss), var(--body) 38%, var(--void)) fixed;
+  background-color: var(--void);
+}
+/* while the inertia layer is live the page is a virtual scroll, so the body must not paint twice */
+/* The overhang of the atmosphere and the orbs is intentional; `clip` (not `hidden`) keeps it from becoming a
+   horizontal scrollbar without turning the root into a scroll container of its own. */
+html { overflow-x: clip; }
+
+
+
+#atmosphere {
+  /* sized from the viewport, never from the element's own intrinsic 300×150 default; `contain: strict` was
+     the first attempt at isolating this paint and it collapsed the box to zero, which is the difference
+     between "the effect is subtle" and "the effect is not there at all". */
+  position: fixed; left: -6vw; top: -6vh; width: 112vw; height: 118vh; min-height: 480px;
+  z-index: 0; pointer-events: none; opacity: .95; display: block;
+  filter: blur(var(--fluid-blur)) saturate(1.12);
+  transform: translate3d(calc((var(--px) - .5) * -14px), calc(var(--sy) * -0.035px), 0) scale(1.04);
+  will-change: transform; contain: paint;
+}
+#atmosphere[data-fluid="no-webgl2"], #atmosphere[data-fluid="skipped"],
+#atmosphere[data-fluid="compile-failed"] { display: none; }        /* pure decoration: it may vanish */
+
+.fluid-orbs { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: clip; }
+.fluid-orb {
+  position: absolute; border-radius: var(--r-blob); filter: blur(48px); opacity: .5;
+  mix-blend-mode: screen; transform: translate3d(var(--fx, 0), calc(var(--fy, 0px) + var(--base-y, 0px)), 0);
+  animation: drift var(--ambient, 24s) var(--e-in-out) infinite alternate;
+}
+.fluid-orb--a { width: 46vw; height: 46vw; left: -8vw; top: 8vh; --ambient: 26s;
+  background: radial-gradient(circle at 40% 40%, rgba(76, 127, 214, .55), transparent 68%); }
+.fluid-orb--b { width: 34vw; height: 34vw; right: -6vw; top: 46vh; --ambient: 31s;
+  background: radial-gradient(circle at 60% 45%, rgba(69, 214, 160, .38), transparent 66%); }
+.fluid-orb--c { width: 26vw; height: 26vw; left: 42vw; bottom: -6vh; --ambient: 22s;
+  background: radial-gradient(circle at 50% 50%, rgba(127, 91, 214, .34), transparent 64%); }
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0) scale(1); border-radius: 46% 54% 42% 58% / 52% 46% 54% 48%; }
+  to   { transform: translate3d(3vw, -4vh, 0) scale(1.12); border-radius: 58% 42% 55% 45% / 44% 56% 44% 56%; }
 }
 
-/* ---- surfaces ------------------------------------------------------------- */
-.panel, .stat { border-radius: var(--r); box-shadow: var(--e1); transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease); }
-.panel:hover { border-color: #27374a; }
-.stat { position: relative; overflow: hidden; }
-.stat::after {          /* the accent rail: a colour that means something, not decoration */
-  content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
-  background: linear-gradient(90deg, transparent, #26313f, transparent);
+.stage { position: relative; z-index: 1; }                                   /* everything real sits here */
+main { isolation: isolate; }
+
+/* ══════════════════════════════════════ §2 · materials ══════════════════════════════════════ */
+.glass, .obj, .panel, .stat, .scene, .rail-inner {
+  background: linear-gradient(168deg, var(--glass-2), var(--glass) 42%, rgba(8, 12, 20, .55));
+  border: 1px solid var(--hair);
+  border-radius: var(--r);
+  box-shadow: var(--lift-1), var(--inset-hair);
+  backdrop-filter: blur(14px) saturate(1.16);
+  -webkit-backdrop-filter: blur(14px) saturate(1.16);
 }
-.stat.ok::after   { background: linear-gradient(90deg, transparent, #2f6b3f, transparent); }
-.stat.warn::after { background: linear-gradient(90deg, transparent, #7a5a1e, transparent); }
-.stat.bad::after  { background: linear-gradient(90deg, transparent, #7a2424, transparent); }
-.stat.info::after { background: linear-gradient(90deg, transparent, #1e4f7a, transparent); }
+/* a surface that can be entered lifts; a surface that only holds text does not */
+.obj, .panel { transition: transform var(--mid) var(--e-out), box-shadow var(--mid) var(--e-out),
+  border-color var(--fast) linear; }
+.obj:hover, .panel:hover { border-color: var(--hair-strong); box-shadow: var(--lift-2), var(--inset-hair); }
+:focus-visible { outline: 2px solid var(--info); outline-offset: 3px; border-radius: 4px; }
 
-/* number entry: the eye should land on the count first, everything else second */
-@keyframes rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
-.stat b, .stat u { animation: rise .34s var(--ease) both; }
-.stat u { animation-delay: .05s; }
+/* ══════════════════════════════════════ §3 · type ══════════════════════════════════════ */
+:root {
+  --display: "Avenir Next", "Futura", "Trebuchet MS", "Segoe UI Variable Display", "Segoe UI",
+             system-ui, sans-serif;
+  --text: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --facts: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-hero: clamp(2.9rem, 7.4vw, 6.6rem);
+  --fs-h1: clamp(2.1rem, 4.6vw, 3.6rem);
+  --fs-h2: clamp(1.15rem, 1.9vw, 1.55rem);
+  --fs-fig: clamp(2.4rem, 5.2vw, 4.1rem);
+}
+body { font-family: var(--text); font-size: 15px; line-height: 1.62; letter-spacing: .004em; }
+h1 {
+  font-family: var(--display); font-size: var(--fs-h1); font-weight: 600; line-height: .98;
+  letter-spacing: -.025em; margin: 0 0 .28em; text-wrap: balance;
+}
+h2 {
+  font-family: var(--display); font-size: var(--fs-h2); font-weight: 600; letter-spacing: -.01em;
+  text-transform: none; color: var(--ink); margin: 40px 0 12px;
+}
+h3 { font-size: 11px; font-weight: 600; letter-spacing: .17em; text-transform: uppercase; color: var(--faint);
+  margin: 0 0 10px; }
+.sub { font-size: clamp(.95rem, 1.15vw, 1.06rem); color: var(--dim); max-width: 66ch; line-height: 1.62;
+  margin: 0 0 26px; text-wrap: pretty; }
+.mini { font-size: 12.5px; color: var(--dim); line-height: 1.55; }
+.hero-line {
+  font-family: var(--display); font-size: var(--fs-hero); font-weight: 600; line-height: .92;
+  letter-spacing: -.035em; margin: 0;
+  text-shadow: 0 0 68px rgba(120, 170, 255, .22);
+}
+.hero-line em { font-style: normal; color: var(--hi); }
+.eyebrow {
+  font-family: var(--facts); font-size: 10.5px; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--faint); margin: 0 0 18px; display: flex; gap: 10px; align-items: center;
+}
+.eyebrow::before { content: ""; width: 26px; height: 1px; background: linear-gradient(90deg, var(--hi), transparent); }
+/* monospace is an accent: it means "this string came from a machine or a field", never "this is the UI" */
+code, kbd, pre, .num, td .quote, .facts, th, .pill, .badge, .stat u, .hero-meta { font-family: var(--facts); }
+a { color: var(--info); text-decoration: none; background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px; background-position: 0 100%; background-repeat: no-repeat;
+  transition: background-size var(--mid) var(--e-out), color var(--fast) linear; }
+a:hover { background-size: 100% 1px; text-decoration: none; }
 
-/* ---- nav ------------------------------------------------------------------ */
-nav a { border-radius: 0 var(--r-sm) var(--r-sm) 0; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
-nav a i { min-width: 16px; text-align: center; border: 1px solid #3c2e14; background: #1a1409; border-radius: 99px; padding: 0 4px; }
-nav .syncing button { opacity: .6; pointer-events: none; }
+/* ══════════════════════════════════ §4 · the space itself ══════════════════════════════════ */
+.shell { display: block; min-height: 100vh; }
+main { padding: 0 clamp(20px, 5vw, 84px) 96px; }
 
-/* ---- tables: sticky head + row affordance + readable density -------------- */
-table { border-radius: var(--r-sm); }
-tbody tr { transition: background var(--dur) var(--ease); }
-tr:hover td { background: #121b26; }
-tr:focus-within td { background: #14202d; }
-td a { border-bottom: 1px solid transparent; }
-td a:hover { border-bottom-color: currentColor; text-decoration: none; }
-/* a table with no rows must not look like a bug */
-tbody tr[data-empty] td { color: var(--dim); font-style: italic; padding: 18px 8px; }
+/* --- the floating rail: a presence, not a column of links ------------------ */
+/* Layer 1 renders `nav` as a sticky bar (correct, boring, works with no CSS file). Here it is lifted into a
+   floating rail and re-tuned; the markup did not change to make this happen, which is the point of keeping
+   the two layers separate. */
+.rail {
+  position: fixed; z-index: 20; left: clamp(10px, 1.4vw, 22px); top: 50%; transform: translateY(-50%);
+  width: 64px; display: block; padding: 0;
+  transition: width var(--mid) var(--e-out);
+}
+.rail { display: grid; gap: 2px; padding: 14px 8px; }
+.rail-inner { border-radius: var(--r-lg); padding: 6px; }
+.rail:hover, .rail:focus-within { width: 236px; }
+.rail nav { display: block; position: static; background: none; border: 0; padding: 0; backdrop-filter: none; }
+.rail nav a { margin: 0 0 1px; }
+.rail .brand { padding: 4px 10px 16px; border: 0; display: block; }
+.rail .brand span { display: block; }
+.rail .brand b { font-family: var(--display); font-size: 16px; letter-spacing: .26em; color: #fff; }
+.rail .brand span { font-size: 9px; letter-spacing: .18em; opacity: .72; }
+.rail nav { display: grid; gap: 1px; border: 0; background: none; padding: 0; position: static; height: auto; overflow: visible; }
+.rail nav a {
+  position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--r-sm);
+  color: var(--dim); font-family: var(--text); font-size: 13px; letter-spacing: .01em; border-left: 0;
+  transition: color var(--fast) linear, background var(--fast) linear, transform var(--mid) var(--e-spring);
+}
+.rail nav a::before {                                     /* a glyph of the place, so the collapsed rail is
+  content: ""; width: 7px; height: 7px; flex: 0 0 auto;      still navigable without reading text */
+  border-radius: 99px; background: var(--hair-strong); transition: background var(--fast) linear, box-shadow var(--mid) linear; }
+.rail nav a:hover { color: var(--ink); background: rgba(152, 183, 235, .07); transform: translateX(3px); }
+.rail nav a.on { color: #fff; background: linear-gradient(90deg, rgba(110, 231, 168, .16), transparent); }
+.rail nav a.on::before { background: var(--hi); box-shadow: 0 0 12px 2px rgba(110, 231, 168, .55); }
+.rail nav a i { font-style: normal; margin-left: auto; font-family: var(--facts); font-size: 10px;
+  padding: 1px 6px; border-radius: 99px; border: 1px solid rgba(255, 196, 107, .35); color: var(--warn);
+  background: rgba(255, 196, 107, .1); }
+.rail nav form { margin: 10px 0 0; padding: 0 4px; }
+.rail nav form input[type=hidden] { display: none; }
+.rail nav form button { width: 100%; font-size: 12px; padding: 7px 10px; }
+.rail nav > .mini { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hair); }
+.rail:not(:hover):not(:focus-within) nav form button, .rail:not(:hover):not(:focus-within) nav > .mini { opacity: 0; pointer-events: none; }
+.rail .rail-actions { padding: 12px 6px 4px; border-top: 1px solid var(--hair); margin-top: 8px; }
+.rail .rail-meta { opacity: 0; transition: opacity var(--mid) var(--e-out); }
+.rail:hover .rail-meta, .rail:focus-within .rail-meta { opacity: 1; }
 
-/* ---- pills and badges ------------------------------------------------------ */
-.pill { transition: filter var(--dur) var(--ease); }
-.pill:hover { filter: brightness(1.16); }
-@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
-.p-live { animation: pulse 2.4s var(--ease) infinite; }
-@media (prefers-reduced-motion: reduce) { *, *::after, *::before { animation: none !important; transition: none !important; } }
+/* --- the scene: the first screen, composed, not stacked ------------------- */
+.scene-head { position: relative; padding: clamp(64px, 13vh, 148px) 0 clamp(28px, 5vh, 56px); }
+.scene-head .lede { max-width: 46ch; }
+.scene-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .78fr); gap: clamp(22px, 4vw, 58px);
+  align-items: center; }
+.hero-figures { display: flex; flex-wrap: wrap; gap: clamp(18px, 3.4vw, 46px); align-items: flex-end;
+  margin-top: 30px; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 11px;
+  letter-spacing: .05em; color: var(--faint); margin: 22px 0 0; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 34px; }
 
-/* ---- buttons: the primary action is one, not four ------------------------- */
-button, input[type=submit] { border-radius: var(--r-sm); transition: background var(--dur) var(--ease), transform var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-button:hover, input[type=submit]:hover { border-color: #33506d; }
-button:active { transform: translateY(1px); }
-button:disabled { opacity: .5; cursor: progress; }
-button[data-variant=danger] { background: #1e1010; border-color: #462222; color: #ffb3b3; }
-button[data-variant=danger]:hover { background: #2a1414; border-color: #6a3030; }
-button[data-variant=go] { background: #10220f; border-color: #2c4a31; color: #b7e9c0; }
-:where(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+/* --- figures: a number standing in space, not a card holding one ---------- */
+.figure { position: relative; padding: 18px 20px 20px; border-radius: var(--r);
+  background: radial-gradient(120% 150% at 12% 0%, rgba(152, 183, 235, .07), transparent 62%);
+  border: 1px solid transparent; transition: border-color var(--mid) linear, transform var(--mid) var(--e-out); }
+.figure:hover { border-color: var(--hair); transform: translate3d(var(--mgx, 0), calc(var(--mgy, 0px) - 3px), 0); }
+.figure .n { display: block; font-family: var(--display); font-size: var(--fs-fig); font-weight: 600;
+  line-height: .86; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.figure .k { display: block; margin-top: 10px; font-size: 12px; color: var(--ink); letter-spacing: .02em; }
+.figure .d { display: block; margin-top: 4px; font-size: 11.5px; color: var(--faint); max-width: 34ch; }
+.figure::after { content: ""; position: absolute; left: 20px; right: 42%; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, var(--tone, var(--hair-strong)), transparent); opacity: .9; }
+.figure[data-tone="ok"]   { --tone: var(--hi); }
+.figure[data-tone="warn"] { --tone: var(--warn); }
+.figure[data-tone="bad"]  { --tone: var(--bad); }
+.figure[data-tone="info"] { --tone: var(--info); }
+.figure[data-tone="ok"] .n   { color: var(--hi); }
+.figure[data-tone="warn"] .n { color: var(--warn); }
+.figure[data-tone="bad"] .n  { color: var(--bad); }
+.figure[data-tone="info"] .n { color: var(--info); }
+.figure--lead { padding: 26px 30px 30px; }
+.figure--lead .n { font-size: clamp(3.2rem, 7vw, 5.6rem); }
 
-/* ---- forms ---------------------------------------------------------------- */
-input, select, textarea { transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
-input:hover, select:hover, textarea:hover { border-color: #2b3d51; }
-textarea:focus { background: #0d141d; }
-label { color: var(--dim); }
+/* --- objects: the row of data, no longer a box ---------------------------- */
+.obj { padding: 16px 18px; margin: 0 0 12px; border-radius: var(--r); }
+.obj + .obj { margin-top: 0; }
+.obj > :last-child { margin-bottom: 0; }
+.obj[data-accent="hi"]   { border-left: 2px solid rgba(110, 231, 168, .55); }
+.obj[data-accent="warn"] { border-left: 2px solid rgba(255, 196, 107, .55); }
+.obj[data-accent="bad"]  { border-left: 2px solid rgba(255, 123, 138, .6); }
+.obj[data-accent="info"] { border-left: 2px solid rgba(134, 184, 255, .5); }
+.obj[data-accent="vio"]  { border-left: 2px solid rgba(191, 166, 255, .5); }
 
-/* ---- empty / error / loading states ---------------------------------------- */
-.empty { display: grid; gap: 8px; place-items: start; padding: 22px 16px; border: 1px dashed #24313f;
-  border-radius: var(--r); background: linear-gradient(180deg, rgba(255,255,255,.012), transparent); }
-.empty h3 { margin: 0; font-size: 13px; color: var(--ink); letter-spacing: 0; text-transform: none; }
-.empty p { margin: 0; color: var(--dim); font-size: 12px; max-width: 62ch; }
-.empty .row { margin-top: 4px; }
+/* --- the ledger table, re-cast as a spatial list --------------------------- */
+.ledger-wrap { border-radius: var(--r); border: 1px solid var(--hair);
+  overflow: auto;      /* auto, not clip: a wide table inside a fluid layout is the one case where the
+                       container, not the page, has to own the overflow */
+  background: linear-gradient(180deg, rgba(152, 183, 235, .045), rgba(8, 12, 20, .34)); }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+thead th {
+  position: sticky; top: 0; z-index: 2; background: rgba(9, 13, 22, .88); backdrop-filter: blur(8px);
+  font-family: var(--facts); font-size: 9.5px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--faint); text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--hair);
+}
+td { padding: 13px 16px; border-bottom: 1px solid rgba(163, 196, 240, .07); vertical-align: top; }
+tbody tr { transition: background var(--fast) linear, transform var(--mid) var(--e-out); }
+tbody tr:hover { background: rgba(152, 183, 235, .05); }
+tbody tr[id]:target, tbody tr[data-live="1"] { background: linear-gradient(90deg, rgba(110, 231, 168, .12), transparent 60%); }
+tbody tr:last-child td { border-bottom: 0; }
+.num { text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ink); }
 
-.skeleton { background: #101821; border-radius: 4px; position: relative; overflow: hidden; min-height: 12px; }
-.skeleton::after { content: ""; position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent, #1a2632, transparent); transform: translateX(-100%); }
-.js .skeleton::after { animation: sweep 1.25s linear infinite; }
-@keyframes sweep { to { transform: translateX(100%); } }
+/* --- receipt: the verbatim span, made to look like evidence, not a cell ---- */
+.quote {
+  position: relative; margin: 0; padding: 12px 14px 12px 30px; color: #cfe4d8; font-size: 12.5px;
+  font-family: var(--facts); line-height: 1.55; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0; border: 0;
+  background: linear-gradient(100deg, rgba(110, 231, 168, .09), rgba(110, 231, 168, .02) 44%, transparent);
+}
+.quote::before { content: ""; position: absolute; left: 12px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--hi), rgba(110, 231, 168, .1)); box-shadow: 0 0 14px rgba(110, 231, 168, .45); }
+.quote.none { color: #e6d4ab; background: linear-gradient(100deg, rgba(255, 196, 107, .09), transparent 55%); }
+.quote.none::before { background: linear-gradient(180deg, var(--warn), rgba(255, 196, 107, .1)); box-shadow: 0 0 14px rgba(255, 196, 107, .4); }
+pre {
+  margin: 0; padding: 14px 16px; border-radius: var(--r-sm); font-family: var(--facts); font-size: 12px;
+  line-height: 1.6; color: #c9d8ef; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  background: linear-gradient(180deg, rgba(134, 184, 255, .06), rgba(6, 10, 18, .6)); border: 1px solid var(--hair);
+  box-shadow: var(--inset-hair);
+}
+code { background: rgba(134, 184, 255, .1); border: 1px solid rgba(134, 184, 255, .12); color: #cfe0ff;
+  border-radius: 6px; padding: 1px 6px; font-size: .86em; }
+kbd { background: rgba(152, 183, 235, .1); border: 1px solid var(--hair-strong); border-bottom-width: 2px;
+  border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-family: var(--facts); }
 
-/* ---- toast: feedback for the POSTs that currently answer with a JSON blob -- */
-.toast-layer { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 40;
-  max-width: min(420px, calc(100vw - 32px)); }
-.toast { background: var(--glass); backdrop-filter: blur(8px); border: 1px solid #2a3a4c; border-radius: var(--r);
-  box-shadow: var(--e2); padding: 9px 11px; font-size: 12px; color: var(--ink); display: grid; gap: 3px;
-  animation: toast-in .22s var(--ease) both; border-left-width: 3px; }
-.toast b { font-weight: 600; }
-.toast.ok    { border-left-color: var(--hi); }
-.toast.warn  { border-left-color: var(--warn); }
-.toast.bad   { border-left-color: var(--bad); }
-.toast.out   { animation: toast-out .2s var(--ease) both; }
-@keyframes toast-in  { from { opacity: 0; transform: translateY(8px) scale(.98); } }
-@keyframes toast-out { to   { opacity: 0; transform: translateY(6px) scale(.98); } }
+/* --- pills and badges: quiet, typographic, one shape each ----------------- */
+.pill, .badge {
+  display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 10px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--hair);
+  background: rgba(152, 183, 235, .05); white-space: nowrap;
+  transition: transform var(--fast) var(--e-spring), border-color var(--fast) linear, background var(--fast) linear;
+}
+.pill:hover, .badge:hover { transform: translateY(-1px); }
+.p-hi, .b-real   { color: var(--hi); border-color: rgba(110, 231, 168, .34); background: rgba(110, 231, 168, .1); }
+.p-warn, .b-sim  { color: var(--warn); border-color: rgba(255, 196, 107, .34); background: rgba(255, 196, 107, .1); }
+.p-bad, .b-none  { color: var(--bad); border-color: rgba(255, 123, 138, .34); background: rgba(255, 123, 138, .1); }
+.p-info          { color: var(--info); border-color: rgba(134, 184, 255, .34); background: rgba(134, 184, 255, .1); }
+.p-vio, .b-oracle{ color: var(--vio); border-color: rgba(191, 166, 255, .34); background: rgba(191, 166, 255, .1); }
+.b-vio           { color: var(--vio); border-color: rgba(191, 166, 255, .34); background: rgba(191, 166, 255, .1); }
 
-/* ---- command palette (progressive enhancement only) ----------------------- */
-.palette { position: fixed; inset: 0; z-index: 50; display: grid; place-items: start center;
-  background: rgba(4,7,11,.66); backdrop-filter: blur(3px); padding-top: 14vh; }
-.palette[hidden] { display: none; }
-.palette-box { width: min(560px, calc(100vw - 32px)); background: var(--panel); border: 1px solid #2a3d52;
-  border-radius: var(--r-lg); box-shadow: var(--e2); overflow: hidden; }
-.palette-box input { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-  padding: 12px 14px; background: #0b1118; font-size: 14px; }
-.palette-box input:focus { outline: none; }
-.palette-list { list-style: none; margin: 0; padding: 6px; max-height: 46vh; overflow: auto; }
-.palette-list li { padding: 0; }
-.palette-list a { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: var(--r-sm); color: var(--ink); }
-.palette-list a:hover, .palette-list a[aria-current="true"] { background: #16212e; text-decoration: none; }
-.palette-list span { color: var(--dim); font-size: 11px; }
-.help dd { margin: 0 0 6px; color: var(--dim); font-size: 12px; }
-.help dt { color: var(--ink); font-size: 12px; margin-top: 8px; }
+/* --- the strip of system truth: computed, and it looks like an instrument --- */
+.strip { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 16px 18px;
+  border-radius: var(--r); border: 1px solid var(--hair); background: rgba(6, 10, 18, .5); }
+.strip-title { font-family: var(--display); font-size: 14px; color: var(--ink); }
+.strip-verdict { font-family: var(--facts); font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--warn); padding: 4px 10px; border-radius: 99px; border: 1px solid rgba(255, 196, 107, .3);
+  background: rgba(255, 196, 107, .08); }
+.strip-verdict[data-s="healthy"] { color: var(--hi); border-color: rgba(110, 231, 168, .3); background: rgba(110, 231, 168, .08); }
+.strip .chip { position: relative; display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px 6px 26px;
+  border-radius: 99px; font-size: 12px; color: var(--dim); border: 1px solid transparent;
+  transition: border-color var(--fast) linear, color var(--fast) linear, background var(--mid) var(--e-out); }
+.strip .chip::before { content: ""; position: absolute; left: 11px; top: 50%; width: 7px; height: 7px;
+  margin-top: -3.5px; border-radius: 99px; background: var(--faint); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+.strip .chip[data-s="healthy"], .strip .chip[data-s="populated"], .strip .chip[data-s="closed"],
+.strip .chip[data-s="empty"] { color: var(--ink); }
+.strip .chip[data-s="healthy"]::before, .strip .chip[data-s="populated"]::before { background: var(--hi);
+  animation: ping 2.8s var(--e-out) infinite; }
+.strip .chip[data-s="closed"]::before { background: var(--info); }
+.strip .chip[data-s="degraded"]::before, .strip .chip[data-s="open"]::before { background: var(--warn);
+  animation: ping 2.8s var(--e-out) infinite; }
+.strip .chip[data-s="unavailable"]::before { background: var(--bad); }
+.strip .chip:hover { border-color: var(--hair-strong); background: rgba(152, 183, 235, .06); }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(110, 231, 168, .5); } 70%, 100% { box-shadow: 0 0 0 9px rgba(110, 231, 168, 0); } }
 
-/* ---- print: a receipt should survive being printed ------------------------ */
+/* --- flow bars: a proportion, drawn as light -------------------------------- */
+.bar { height: 6px; border-radius: 99px; background: rgba(152, 183, 235, .1); overflow: hidden; border: 0;
+  box-shadow: var(--inset-hair); }
+.bar > i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(110, 231, 168, .35), var(--hi));
+  box-shadow: 0 0 18px rgba(110, 231, 168, .5); transition: width var(--slow) var(--e-out); }
+.bar.warn > i { background: linear-gradient(90deg, rgba(255, 196, 107, .3), var(--warn)); box-shadow: 0 0 18px rgba(255, 196, 107, .45); }
+.bar.bad > i { background: linear-gradient(90deg, rgba(255, 123, 138, .3), var(--bad)); box-shadow: 0 0 18px rgba(255, 123, 138, .45); }
+
+/* --- controls: one primary gesture per screen ------------------------------ */
+input, select, textarea {
+  font-family: var(--text); font-size: 13.5px; color: var(--ink);
+  background: rgba(6, 10, 18, .55); border: 1px solid var(--hair); border-radius: var(--r-sm); padding: 8px 12px;
+  transition: border-color var(--fast) linear, box-shadow var(--mid) var(--e-out), background var(--fast) linear;
+}
+input:hover, select:hover, textarea:hover { border-color: var(--hair-strong); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: rgba(134, 184, 255, .5);
+  box-shadow: 0 0 0 4px rgba(134, 184, 255, .12); background: rgba(9, 14, 24, .8); }
+textarea { font-family: var(--text); line-height: 1.55; }
+button, input[type=submit], .btn {
+  position: relative; font-family: var(--text); font-size: 13px; font-weight: 500; letter-spacing: .01em;
+  color: #eaf2ff; background: linear-gradient(180deg, rgba(152, 183, 235, .16), rgba(152, 183, 235, .06));
+  border: 1px solid var(--hair-strong); border-radius: 99px; padding: 8px 16px; cursor: pointer;
+  transform: translate3d(var(--mgx, 0px), var(--mgy, 0px), 0);
+  transition: background var(--fast) linear, border-color var(--fast) linear, box-shadow var(--mid) var(--e-out);
+  will-change: transform;
+}
+button:hover, input[type=submit]:hover, .btn:hover { background: linear-gradient(180deg, rgba(152, 183, 235, .26), rgba(152, 183, 235, .1));
+  box-shadow: 0 10px 26px -12px rgba(120, 170, 255, .5); }
+button:active, input[type=submit]:active { transform: translate3d(var(--mgx, 0px), calc(var(--mgy, 0px) + 1px), 0); }
+button:disabled { opacity: .45; cursor: progress; }
+button[data-variant=go] { background: linear-gradient(180deg, rgba(110, 231, 168, .22), rgba(110, 231, 168, .06));
+  border-color: rgba(110, 231, 168, .4); color: #d9ffe9; }
+button[data-variant=danger] { background: linear-gradient(180deg, rgba(255, 123, 138, .2), rgba(255, 123, 138, .05));
+  border-color: rgba(255, 123, 138, .42); color: #ffdfe3; }
+.btn-hero { font-size: 14.5px; padding: 13px 26px; border-radius: 99px; }
+.btn-ghost { background: none; border-color: var(--hair); color: var(--dim); }
+form.inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 22px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.sep { height: 1px; background: var(--hair); margin: 16px 0; border: 0; }
+.notice { border: 1px solid rgba(110, 231, 168, .25); background: rgba(110, 231, 168, .07);
+  color: #d5f0dd; padding: 14px 16px; border-radius: var(--r); font-size: 13.5px; line-height: 1.6; }
+.notice.bad { border-color: rgba(255, 123, 138, .3); background: rgba(255, 123, 138, .08); color: #ffdfe3; }
+.notice.info { border-color: rgba(134, 184, 255, .3); background: rgba(134, 184, 255, .08); color: #d7e7ff; }
+
+/* --- the WebGL field of facts --------------------------------------------- */
+.scene { position: relative; border-radius: var(--r-lg); overflow: clip;
+  height: clamp(320px, 46vh, 560px);
+  background: radial-gradient(80% 70% at 50% 40%, rgba(76, 127, 214, .16), transparent 70%); }
+.scene canvas { display: block; width: 100%; height: 100%; }
+html:not(.js) .scene canvas, .scene canvas[data-fluid="no-webgl2"], .scene canvas[data-fluid="empty"] {
+  min-height: 100%; }
+/* the field's fallback: a canvas that never painted still must not look like a hole in the page */
+.scene canvas[data-fluid="empty"] + .scene-legend span::after { content: " · the ledger has no rows to draw"; }
+.scene-tip {
+  position: absolute; left: var(--tipx, 0); top: var(--tipy, 0); transform: translate(-50%, -160%);
+  pointer-events: none; opacity: 0; transition: opacity var(--fast) linear, transform var(--mid) var(--e-spring);
+  font-family: var(--facts); font-size: 11.5px; letter-spacing: .02em; padding: 7px 11px; border-radius: 99px;
+  background: rgba(6, 10, 18, .86); border: 1px solid var(--hair-strong); color: var(--ink); white-space: nowrap;
+  box-shadow: var(--lift-2);
+}
+.scene[data-hover="1"] .scene-tip { opacity: 1; transform: translate(-50%, -190%); }
+.scene-legend { position: absolute; left: 16px; bottom: 14px; display: flex; gap: 14px; font-size: 11px;
+  color: var(--dim); font-family: var(--facts); }
+.scene-legend i { display: inline-block; width: 7px; height: 7px; border-radius: 99px; margin-right: 6px; }
+.scene-index { position: absolute; right: 14px; top: 14px; width: min(268px, 46%); max-height: 82%; overflow: auto;
+  padding: 10px; border-radius: var(--r); background: rgba(6, 10, 18, .5); border: 1px solid var(--hair);
+  opacity: 0; transform: translateY(-6px); pointer-events: none;
+  transition: opacity var(--mid) var(--e-out), transform var(--mid) var(--e-out); }
+.scene:hover .scene-index, .scene:focus-within .scene-index { opacity: 1; transform: none; pointer-events: auto; }
+.scene-index a { display: block; padding: 4px 8px; border-radius: var(--r-xs); font-size: 12px; color: var(--dim); }
+.scene-index a:hover, .scene-index a:focus-visible { color: #fff; background: rgba(152, 183, 235, .1); }
+
+/* --- timeline / stream: a path through space, not a table ----------------- */
+.stream { position: relative; padding-left: 26px; }
+.stream::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--hair-strong) 12%, var(--hair-strong) 84%, transparent); }
+.stream-item { position: relative; padding: 12px 0 16px; }
+.stream-item::before { content: ""; position: absolute; left: -23px; top: 20px; width: 9px; height: 9px;
+  border-radius: 99px; background: var(--body); border: 1px solid var(--hair-strong); }
+.stream-item[data-severity="HIGH"]::before { background: var(--bad); border-color: transparent; box-shadow: 0 0 14px rgba(255, 123, 138, .6); }
+.stream-item[data-severity="MED"]::before { background: var(--warn); border-color: transparent; box-shadow: 0 0 14px rgba(255, 196, 107, .5); }
+.stream-item .when { font-family: var(--facts); font-size: 10.5px; letter-spacing: .12em; color: var(--faint); }
+
+/* --- editorial asides: prose that is allowed to be big and unboxed -------- */
+.aside { max-width: 64ch; padding: 0 0 0 22px; border-left: 1px solid var(--hair); color: var(--dim);
+  font-size: 14.5px; line-height: 1.7; }
+.aside b, .aside strong { color: var(--ink); }
+.lead { font-family: var(--display); font-size: clamp(1.15rem, 2vw, 1.6rem); line-height: 1.4; letter-spacing: -.015em;
+  color: var(--ink); max-width: 30ch; text-wrap: balance; }
+
+/* --- footer: present but not shouting ------------------------------------- */
+.foot { margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12px;
+  display: grid; gap: 8px; }
+.foot b { color: var(--dim); font-weight: 500; }
+
+/* --- asymmetric composition helpers (used instead of a fourth grid) ------- */
+.compose { display: grid; gap: clamp(16px, 2.2vw, 30px); grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
+.compose > * { grid-column: span 12; }
+.c-7 { grid-column: span 7; } .c-5 { grid-column: span 5; } .c-8 { grid-column: span 8; } .c-4 { grid-column: span 4; }
+.c-6 { grid-column: span 6; } .c-9 { grid-column: span 9; } .c-3 { grid-column: span 3; }
+.push-1 { margin-left: clamp(10px, 4vw, 74px); } .pull--1 { margin-left: clamp(-70px, -4vw, -20px); }
+.stack { display: grid; gap: 12px; }
+.stack-lg { display: grid; gap: clamp(22px, 3vw, 44px); }
+/* the legacy grid classes keep working, re-tuned to the new rhythm */
+.grid { display: grid; gap: 14px; }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+.panel { padding: 18px 20px; margin-bottom: 14px; }
+.stat { padding: 16px 18px; }
+.stat b { display: block; font-family: var(--display); font-size: clamp(1.9rem, 3.4vw, 2.7rem); font-weight: 600;
+  line-height: .95; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.stat span { display: block; margin-top: 8px; font-size: 12.5px; }
+.stat u { display: block; text-decoration: none; margin-top: 3px; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--faint); }
+.ok .n, .ok b { color: var(--hi); } .warn .n, .warn b { color: var(--warn); }
+.bad .n, .bad b { color: var(--bad); } .info .n, .info b { color: var(--info); }
+
+/* ══════════════════════════════════════ §5 · motion ══════════════════════════════════════ */
+/* ambient: one slow breath on the hero light, nothing else loops without being touched */
+html:not([data-fluid-motion="reduced"]) .hero-line { animation: breathe 16s var(--e-in-out) infinite alternate; }
+@keyframes breathe { from { text-shadow: 0 0 68px rgba(120, 170, 255, .18); } to { text-shadow: 0 0 96px rgba(110, 231, 168, .26); } }
+
+/* narrative: an element enters once, on approach, with the spring carrying it */
+[data-reveal] { opacity: 0; transform: translate3d(0, 22px, 0) scale(.994);
+  transition: opacity var(--slow) var(--e-out), transform var(--slow) var(--e-out); }
+[data-reveal].is-in { opacity: 1; transform: none; }
+[data-parallax], [data-depth] {
+  transform: translate3d(var(--fx, 0), var(--fy, 0px), 0) rotate(var(--fr, 0deg)) skewX(var(--fsk, 0deg));
+}
+/* the cursor, drawn by the page so it can share the page's physics */
+.fluid-cursor { position: fixed; inset: 0; z-index: 60; pointer-events: none; --cs: 1; --stretch: 1; --rot: 0deg; }
+.fluid-ring {
+  position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 99px;
+  border: 1px solid rgba(190, 215, 250, .5); transform: translate3d(var(--cx, 0), var(--cy, 0), 0)
+    rotate(var(--rot)) scale(calc(var(--cs) * var(--stretch)), calc(var(--cs) / var(--stretch)));
+  transition: border-color var(--mid) linear, background var(--mid) linear, width var(--mid) var(--e-spring),
+              height var(--mid) var(--e-spring), margin var(--mid) var(--e-spring);
+  display: grid; place-items: center;
+}
+.fluid-ring-label { font-family: var(--facts); font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: #060a12; opacity: 0; transition: opacity var(--fast) linear; white-space: nowrap; }
+.fluid-dot { position: absolute; left: 0; top: 0; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 99px;
+  background: #eaf2ff; transform: translate3d(var(--dx, 0), var(--dy, 0), 0); }
+.fluid-cursor[data-state="press"] .fluid-ring { width: 58px; height: 58px; margin: -29px 0 0 -29px;
+  background: rgba(190, 215, 250, .1); border-color: rgba(190, 215, 250, .28); }
+.fluid-cursor[data-state="read"] .fluid-ring { width: 78px; height: 78px; margin: -39px 0 0 -39px;
+  background: rgba(110, 231, 168, .12); border-color: rgba(110, 231, 168, .4); }
+.fluid-cursor[data-state="read"] .fluid-ring-label { opacity: 1; }
+.fluid-cursor[data-state="open"] .fluid-ring { width: 88px; height: 88px; margin: -44px 0 0 -44px;
+  background: rgba(134, 184, 255, .12); border-color: rgba(134, 184, 255, .42); }
+.fluid-cursor[data-state="open"] .fluid-ring-label { opacity: 1; }
+/* a live region must be able to move without a scroll jump feeling like a bug */
+.toast-layer { z-index: 55; }
+
+/* view transitions: the header morphs, the rail stays, the content dives */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: vt-out 260ms var(--e-in-out) both; }
+  ::view-transition-new(root) { animation: vt-in 460ms var(--e-out) both; }
+  ::view-transition-old(rail), ::view-transition-new(rail) { animation: none; mix-blend-mode: normal; }
+}
+@keyframes vt-out { to { opacity: 0; transform: translate3d(0, -3%, 0) scale(.985); filter: blur(4px); } }
+@keyframes vt-in { from { opacity: 0; transform: translate3d(0, 4%, 0) scale(1.012); } }
+.rail { view-transition-name: rail; }
+
+/* ══════════════════════════════════ §6 · degradation ══════════════════════════════════════ */
+/* reduced motion: keep the material, lose the movement. Nothing here needs a JS flag. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; }
+  [data-reveal] { opacity: 1; transform: none; }
+  #atmosphere { opacity: .6; filter: blur(40px); transform: none; }
+  .fluid-orb { animation: none; transform: none; }
+  .fluid-cursor { display: none; }
+  .rail { width: 232px; }
+  .rail nav a { transform: none; }
+}
+html[data-fluid-motion="reduced"] [data-parallax], html[data-fluid-motion="reduced"] [data-depth] { transform: none !important; }
+html[data-fluid-motion="reduced"] .figure:hover { transform: none; }
+/* the .js flag already exists in layer 2; motion.js adds a second so a missing script is distinguishable */
+html:not(.js) .fluid-cursor, html:not(.js) .scene-tip { display: none; }
+
+/* touch: no cursor, no hover-revealed panels, bigger targets, same information */
+@media (hover: none), (pointer: coarse) {
+  .fluid-cursor { display: none; }
+  .scene-index { opacity: 1; transform: none; pointer-events: auto; position: static; width: auto; max-height: none; }
+  .figure:hover { transform: none; }
+}
+
+/* narrow: the rail becomes a floating dock, the composition stacks, type steps down */
+@media (max-width: 1080px) {
+  .scene-grid { grid-template-columns: 1fr; }
+  .c-7, .c-5, .c-8, .c-4, .c-6, .c-9, .c-3 { grid-column: span 12; }
+  .pull--1, .push-1 { margin-left: 0; }
+}
+@media (max-width: 860px) {
+  /* The dock. Layer 2 wraps the nav in `.rail`; layer 1 emits a bare `nav`, and the query has to dock
+     whichever exists — otherwise a phone gets a full-height floating column it cannot scroll past. The
+     `.rail nav` rule below only ever makes the *inner* list horizontal; it must not undo the dock. */
+  .rail, body > .shell > nav, main > nav {
+    position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; transform: none;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); z-index: 30; display: block;
+    background: rgba(6, 10, 18, .9); backdrop-filter: blur(14px); border: 1px solid var(--hair);
+    border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--lift-3); }
+  nav { border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
+  .rail-inner { border-radius: var(--r-lg); }
+  .rail nav { display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 0; border: 0;
+    background: none; box-shadow: none; position: static; }
+  body > .shell > nav, main > nav { display: flex; align-items: center; gap: 4px; overflow-x: auto;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .rail nav a, nav a { padding: 10px 12px; min-height: 40px; flex: 0 0 auto; }
+  .rail nav a::before, nav a::before { width: 6px; height: 6px; }
+  .rail .brand, .rail .rail-actions, nav .brand { display: none; }
+  .rail .rail-meta, nav > .mini { display: none; }
+  nav form { margin-left: auto; }
+  main { padding: 0 16px 120px; }
+  .scene-head { padding-top: 46px; }
+  .hero-figures { gap: 18px 26px; }
+  .stream { padding-left: 18px; }
+}
+@media (max-width: 620px) {
+  body { font-size: 14.5px; }
+  table { display: block; overflow-x: auto; }
+  .quote { white-space: pre-wrap; }
+  .foot { margin-top: 44px; }
+}
+
+/* print: a receipt should survive being printed, and the atmosphere should not cost toner */
 @media print {
-  nav, .foot, form, button, .toast-layer { display: none !important; }
-  body { background: #fff; color: #111; }
-  .shell { display: block; }
-  .panel, .stat, pre, .quote { border-color: #bbb; box-shadow: none; background: #fff; color: #111; }
+  #atmosphere, .fluid-orbs, .fluid-cursor, .rail, .toast-layer, form, button { display: none !important; }
+  body, html { background: #fff; color: #111; }
+  .glass, .obj, .panel, .stat, .figure, pre, .quote { background: #fff; border-color: #ccc; box-shadow: none;
+    backdrop-filter: none; color: #111; }
+  .hero-line { font-size: 26pt; text-shadow: none; }
   a { color: #111; }
 }
 
-/* ---- responsive: the nav collapses to a top bar, tables get their own axis  */
-@media (max-width: 880px) {
-  .shell { grid-template-columns: 1fr; }
-  nav { position: static; height: auto; display: flex; gap: 6px; overflow-x: auto; padding: 8px;
-        border-right: 0; border-bottom: 1px solid var(--line); align-items: center; }
-  nav .brand { border: 0; padding: 0 8px 0 0; flex: 0 0 auto; }
-  nav a { border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm); padding: 5px 9px; flex: 0 0 auto; }
-  nav a.on { border-bottom-color: var(--hi); background: #111a24; }
-  nav > div:last-child { margin: 0 0 0 auto; flex: 0 0 auto; padding: 0; border: 0; }
-  main { padding: 12px 12px 48px; }
-  h1 { font-size: 16px; }
-}
-@media (max-width: 640px) {
-  .g4, .g3, .g2 { grid-template-columns: 1fr; }
-  table { display: block; overflow-x: auto; white-space: nowrap; }
-  td.quote, .quote, pre { white-space: normal; word-break: break-word; }
-  .stat b { font-size: 22px; }
-  .toast-layer { right: 8px; left: 8px; bottom: 8px; max-width: none; }
-  /* tap targets: a 10px pill on a phone is not a control */
-  nav a, button, input[type=submit] { min-height: 30px; }
-}
+/* toast: the layer 1 markup names the parts; the fluid layer gives them weight and motion */
+.toast-layer { display: grid; gap: 10px; z-index: 55; }
+.toast { position: relative; display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--r);
+  border: 1px solid var(--hair-strong); border-left: 2px solid var(--hi);
+  background: linear-gradient(168deg, rgba(20, 28, 44, .92), rgba(8, 12, 20, .94));
+  box-shadow: var(--lift-3); color: var(--ink); font-size: 13px; backdrop-filter: blur(12px);
+  animation: fluid-toast-in var(--mid) var(--e-spring) both; }
+.toast b { font-family: var(--display); font-size: 14.5px; letter-spacing: -.01em; }
+.toast.warn { border-left-color: var(--warn); } .toast.bad { border-left-color: var(--bad); }
+.toast.info { border-left-color: var(--info); }
+.toast.out { animation: fluid-toast-out var(--fast) var(--e-out) both; }
+.toast-dismiss { justify-self: start; background: none; border: 0; padding: 0; color: var(--faint); font-size: 12px; }
+.toast-dismiss:hover { color: var(--ink); }
+@keyframes fluid-toast-in  { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } }
+@keyframes fluid-toast-out { to   { opacity: 0; transform: translate3d(0, 8px, 0) scale(.99); } }
+
+/* the rail's proximity signal, set by alibi.js from intersection ratios */
+.rail nav a[data-near="1"] { color: #fff; background: rgba(152, 183, 235, .08); }
+.rail nav a[data-near="1"]::before { background: var(--info); box-shadow: 0 0 10px 1px rgba(134, 184, 255, .5); }
+
+/* pointer-tilt on objects you can open — 3D, not a scale bump */
+.obj[data-cursor], .figure--lead { transform-style: preserve-3d;
+  transform: perspective(var(--tilt-persp, 1000px)) rotateX(var(--tiltx, 0deg)) rotateY(var(--tilty, 0deg))
+             translate3d(var(--mgx, 0px), var(--mgy, 0px), 0);
+  transition: transform var(--mid) var(--e-out), box-shadow var(--mid) var(--e-out), border-color var(--fast) linear; }
+html[data-fluid-motion="reduced"] .obj[data-cursor], html[data-fluid-motion="reduced"] .figure--lead { transform: none; }
+
+/* A table wider than its column must scroll in place. Doing this globally (rather than wrapping every
+   table in markup) is the difference between one overflow rule and seventeen templates that can forget it. */
+main table { max-width: 100%; }
+.panel table, .obj table, .c-12 table, .c-7 table, .c-5 table, .c-6 table, .c-8 table {
+  display: block; overflow-x: auto; }
+.panel table thead th, .obj table thead th { position: static; }

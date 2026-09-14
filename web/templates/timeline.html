@@ -1,50 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Timeline{% endblock %}
+
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">change events · {{ rows | length }} in the visible window</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">The ledger<br>is <em>time</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Each row is one field that moved, typed, with the direction it
+        moved in and the buffer it cost — computed from dates, never graded by a model. State is a snapshot;
+        only the stream tells you whether the ground is moving.</p>
+      <form class="inline" method="get" style="margin-top:24px">
+        <label class="mini">subject</label>
+        <select name="subject_id" onchange="this.form.submit()">
+          <option value="">— all {{ subjects | length }} subjects —</option>
+          {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject_id }}>{{ s }}</option>{% endfor %}
+        </select>
+        <noscript><button>go</button></noscript>
+        <span class="mini">{{ rows | length }} change(s) shown</span>
+      </form>
+    </div>
+    <div class="c-4" data-depth="3.6">
+      {% set hi = rows | selectattr('severity','eq','HIGH') | list | length %}
+      {% set cor = rows | selectattr('is_correction') | list | length %}
+      {% set early = rows | selectattr('direction','eq','EARLIER') | list | length %}
+      <div class="stack">
+        {{ stat(hi, 'severe', 'severity = hours of buffer destroyed', 'bad' if hi else 'ok', true) }}
+        {{ stat(rows | length, 'changes', 'in the visible window') }}
+        {{ stat(early, 'moved earlier', 'the only direction that hurts', 'warn' if early else 'ok') }}
+        {{ stat(cor, 'cross-source corrections', 'a fact that arrived from a different source', 'info') }}
+      </div>
+    </div>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Timeline</h1>
-<p class="sub">The ledger is time, not state. Each row is one field that moved, typed, with the direction
-  it moved in and the buffer it cost — computed from dates, never graded by a model.</p>
-<form class="inline" method="get">
-  <label class="mini">subject</label>
-  <select name="subject_id" onchange="this.form.submit()">
-    <option value="">— all {{ subjects | length }} subjects —</option>
-    {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject_id }}>{{ s }}</option>{% endfor %}
-  </select>
-  <span class="mini">{{ rows | length }} change(s) shown</span>
-</form>
-
-<div class="grid g4" style="margin:10px 0">
-  {% set hi = rows | selectattr('severity','eq','HIGH') | list | length %}
-  {% set cor = rows | selectattr('is_correction') | list | length %}
-  {% set early = rows | selectattr('direction','eq','EARLIER') | list | length %}
-  {{ stat(rows | length, 'changes', 'in the visible window') }}
-  {{ stat(hi, 'severe', 'severity = hours of buffer destroyed', 'bad' if hi else 'ok') }}
-  {{ stat(early, 'moved earlier', 'the only direction that hurts', 'warn' if early else 'ok') }}
-  {{ stat(cor, 'cross-source corrections', 'a fact that arrived from a different source', 'info') }}
-</div>
-
-<table>
-<thead><tr><th>when</th><th>kind</th><th>subject</th><th>what moved</th><th>direction</th>
-  <th class="num">buffer</th><th>authority</th><th>evidence</th></tr></thead>
-<tbody>
-{% for r in rows %}
-<tr>
-  <td class="mini">{{ r.ts[11:19] }}<br>{{ r.ts[5:10] }}</td>
-  <td>{{ pill(r.kind, 'p-bad' if r.severity=='HIGH' else ('p-warn' if r.severity=='MED' else '')) }}</td>
-  <td><a href="/lineage?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a>
-      <div class="mini">{{ r.predicate }}</div></td>
-  <td>{% if r.old_value %}<code>{{ r.old_value }}</code> → {% endif %}<code>{{ r.new_value or '∅' }}</code>
-      <div class="mini">{{ r.detail }}</div></td>
-  <td>{{ pill(r.direction or '—', 'p-bad' if r.direction=='EARLIER' else ('p-info' if r.direction=='LATER' else '')) }}</td>
-  <td class="num">{% if r.buffer_delta_hours %}{{ (r.buffer_delta_hours / 24) | round(1) }}d{% else %}—{% endif %}</td>
-  <td class="mini">{% if r.old_source and r.new_source %}{{ r.old_source }} → <b>{{ r.new_source }}</b>
-    {% else %}same source{% endif %}</td>
-  <td>{% if r.evidence_span %}<span class="quote" style="max-width:34ch;display:inline-block">{{ r.evidence_span[:110] }}</span>
-    {% else %}<span class="mini">—</span>{% endif %}</td>
-</tr>
+{% if rows %}
+<ol class="stream" style="list-style:none;margin:0;padding:0 0 0 26px" data-reveal>
+  {% for r in rows %}
+  <li class="stream-item" data-severity="{{ r.severity or 'LOW' }}" data-depth="{{ 0.6 + loop.index0 % 4 * 0.5 }}"
+      style="padding-bottom:26px">
+    <div class="compose">
+      <div class="c-3">
+        <p class="when">{{ r.ts[5:10] }} · {{ r.ts[11:19] }}</p>
+        <p class="mini" style="margin-top:6px">{{ pill(r.kind, 'p-bad' if r.severity=='HIGH' else ('p-warn' if r.severity=='MED' else '')) }}
+          {{ pill(r.direction or '—', 'p-bad' if r.direction=='EARLIER' else ('p-info' if r.direction=='LATER' else '')) }}</p>
+      </div>
+      <div class="c-6">
+        <p style="margin:0 0 4px"><a href="/lineage?subject_id={{ r.subject_id }}" style="font-size:1.05rem">{{ r.subject_id }}</a>
+          <span class="mini">· {{ r.predicate }}</span></p>
+        <p class="mini" style="margin:0">{% if r.old_value %}<code>{{ r.old_value }}</code> → {% endif %}<code>{{ r.new_value or '∅' }}</code></p>
+        <p class="mini" style="margin:6px 0 0;max-width:52ch">{{ r.detail }}</p>
+      </div>
+      <div class="c-3">
+        <p class="num" style="font-size:1.2rem;font-family:var(--display)">{% if r.buffer_delta_hours %}{{ (r.buffer_delta_hours / 24) | round(1) }}d{% else %}—{% endif %}</p>
+        <p class="mini" style="margin:2px 0 0">buffer</p>
+      </div>
+      <div class="c-12" style="margin-top:8px">
+        <p class="mini">{% if r.old_source and r.new_source %}authority moved: {{ r.old_source }} → <b>{{ r.new_source }}</b>
+          {% else %}same source, newer statement{% endif %}</p>
+        {% if r.evidence_span %}<div class="quote" style="margin-top:6px">{{ r.evidence_span[:220] }}</div>{% endif %}
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
 {% else %}
-<tr><td colspan="8" class="mini">Nothing changed. That is a fact about the documents, not a promise
-  from the system — re-sync after a notice goes up and this list grows.</td></tr>
-{% endfor %}
-</tbody></table>
+<div class="notice">Nothing changed. That is a fact about the documents, not a promise from the system —
+  re-sync after a notice goes up and this list grows.</div>
+{% endif %}
 {% endblock %}

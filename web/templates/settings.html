@@ -1,10 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">read from the environment at startup · mode {{ prov.mode }}</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Config, not<br><em>code</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">What this instance is configured to do, read from the environment at startup. Values are shown so you can check them; secrets are shown as presence only, and API keys are never sent to the browser at all.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">A different college is a different file.</p>
+      <p class="mini" style="margin-top:10px">Authority tiers, the eligibility floor, the condonation floor, the supersession rule and the late-submission default all live in policy. That is the reason the same build is portable and the rules are not baked in.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Settings</h1>
-<p class="sub">What this instance is configured to do, read from the environment at startup. Values are
-  shown so you can check them; secrets are shown as presence only, and the API keys are never sent to
-  the browser at all.</p>
+
 <div class="grid g2">
 <div class="panel">
   <h3>Runtime</h3>
@@ -21,7 +34,27 @@ note       {{ prov.fallback_note }}</pre>
     extractor slot. Install a model to replace it:
     <code>ollama pull gemma4:e4b</code>.
     {% else %}A model answered the health probe. Its identity, version and latency are recorded on every
-    claim it touched, so a later disagreement can be attributed.{% endif %}
+    claim it touched, so a later disagreement can be attributed.<script>
+/* The button is built by the script that reads the store, because a control whose label is a guess about
+   the current value is worse than no control: it would have to say "off" while the setting says "on". */
+(function () {
+  var btn = document.getElementById("fluid-toggle");
+  if (!btn) return;
+  var off = false;
+  try { off = localStorage.getItem("alibi.fluid.off") === "1"; } catch (e) { }
+  if (!("localStorage" in window)) { btn.disabled = true; btn.textContent = "This browser blocks saved preferences"; return; }
+  function paint() { btn.textContent = off ? "Turn the fluid layer off for this browser"
+                                           : "Turn the fluid layer back on for this browser"; }
+  paint();
+  btn.addEventListener("click", function () {
+    off = !off;
+    try { localStorage.setItem("alibi.fluid.off", off ? "1" : "0"); } catch (e) { }
+    paint();
+    location.reload();      // the layer is read once, at load; pretending it could be unwound mid-page is worse
+  });
+})();
+</script>
+{% endif %}
   </div>
 </div>
 <div class="panel">
@@ -39,3 +72,19 @@ note       {{ prov.fallback_note }}</pre>
     Back it up with <code>sqlite3 {{ db }} ".backup twin.db"</code> and delete it to erase everything.</p>
 </div>
 {% endblock %}
+
+{# ── the renovation's own settings block, appended so the existing panels (config, retention, model)
+   stay exactly as they are and keep working. Two things a student is ever asked to decide: how loud the
+   environment is, and whether the technical surfaces are one click away. ── #}
+{% if calm %}
+<section class="sec" aria-labelledby="calm-h" style="margin-top:26px">
+  <h2 id="calm-h">Reading preferences</h2>
+  <p class="mini">ALIBI's six main pages are already motion-free. The advanced pages carry the fluid layer —
+    the WebGL field, the inertial scroll, the cursor — and it can be turned off here if it is in your way.</p>
+  <div class="row" style="margin-top:10px">
+    <button class="btn" type="button" id="fluid-toggle">Checking this browser…</button>
+  </div>
+  <p class="mini" style="margin-top:12px">Everything technical, in one place:
+    <a class="act" href="/technical">claims · lineage · verifier · solver · audit · data routing</a></p>
+</section>
+{% endif %}

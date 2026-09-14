@@ -35,18 +35,44 @@ from . import __init__ as _pkg              # noqa: F401  (keeps `alibi` importa
 from .actions import Action, draft_extension_email, open_action
 from .config import Config, resolve_mode
 from .log import configure as _configure_log, get as _get_log
+from .present import Presentation   # the ledger, phrased for a human — see alibi/present.py
 from .twin import Twin
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "web" / "templates"))
-NAV = [("cockpit", "Cockpit", "/"), ("twin", "Twin", "/twin"), ("timeline", "Timeline", "/timeline"),
-       ("claims", "Claims", "/claims"), ("lineage", "Lineage", "/lineage"),
-       ("conflicts", "Conflicts", "/conflicts"), ("queue", "Review queue", "/queue"),
-       ("feasibility", "Feasibility", "/feasibility"), ("risk", "Risk", "/risk"),
-       ("actions", "Actions", "/actions"), ("sources", "Sources", "/sources"),
-       ("privacy", "Data routing", "/privacy"), ("eval", "Evaluation", "/eval"),
-       ("audit", "Audit", "/audit"), ("settings", "Settings", "/settings"),
-       ("docs", "Docs", "/docs")]
+# Six destinations a student can say out loud, in the order they are used. The ledger's own nouns — claims,
+# lineage, supersessions, conflicts, feasibility, risk — are *not* navigation items: they are what the six
+# screens are made of, and they stay reachable (deep links, the Review badge, /technical) because the audit
+# trail is the product's promise. A nav item per table is how a database becomes a UI.
+#: exactly six, in the order a student reads them: what matters now · when · what to do · what only I can
+#: answer · the proof · how the tool behaves. `Review` before `Evidence` is deliberate — an unanswered
+#: question outranks an answered one — and the count is pinned by a test, because a seventh item is how a
+#: "command centre" slides back into a dashboard of panels.
+NAV = [("home", "Home", "/"), ("calendar", "Calendar", "/calendar"), ("tasks", "Tasks", "/tasks"),
+       ("review", "Review", "/review"), ("evidence", "Evidence", "/evidence"),
+       ("settings", "Settings", "/settings")]
+
+#: the technical surfaces, grouped once for the "Advanced" index page
+NAV_ADVANCED = [
+    ("The ledger", [("claims", "Claims", "/claims"), ("lineage", "Lineage", "/lineage"),
+                    ("twin", "Subject graph", "/twin"), ("timeline", "Change timeline", "/timeline"),
+                    ("sources", "Sources", "/sources")]),
+    ("Judgment", [("queue", "Review queue", "/queue"), ("conflicts", "Conflicts", "/conflicts"),
+                  ("actions", "Actions awaiting approval", "/actions")]),
+    ("Planning", [("feasibility", "Feasibility solver", "/feasibility"), ("risk", "Risk forecasts", "/risk")]),
+    ("The system", [("eval", "Evaluation", "/eval"), ("privacy", "Data routing", "/privacy"),
+                    ("audit", "Audit log", "/audit"), ("cockpit", "Field of facts", "/technical/cockpit"),
+                    ("metrics", "Metrics", "/metrics"), ("settings", "Settings", "/settings"),
+                    ("docs", "Docs", "/docs")]),
+]
+
+#: a template rendered for an advanced page still has to light up the *right* nav entry
+NAV_OF_SLUG = {"home": "home", "calendar": "calendar", "tasks": "tasks", "evidence": "evidence",
+               "review": "review", "onboard": "home", "settings": "settings", "advanced": "settings",
+               "cockpit": "home", "twin": "evidence", "timeline": "evidence", "claims": "evidence",
+               "lineage": "evidence", "conflicts": "review", "queue": "review", "feasibility": "tasks",
+               "risk": "tasks", "actions": "review", "sources": "evidence", "privacy": "settings",
+               "eval": "settings", "audit": "settings", "docs": "settings"}
 
 
 class AppState:
@@ -178,6 +204,8 @@ def create_app(twin: Twin | None = None) -> FastAPI:
 
     templates = TEMPLATES
 
+    present = Presentation(twin)     # the human-facing read side; see alibi/present.py
+
     def page(request: Request, name: str, **ctx) -> HTMLResponse:
         """One place where every page gets the same context. `stats` and `chrome` are injected here,
         not passed by each route, because a page that forgets them would otherwise 500 on the *shell*,
@@ -186,11 +214,32 @@ def create_app(twin: Twin | None = None) -> FastAPI:
         body = templates.TemplateResponse(request, name, {
             "nav": NAV, "active": name.split(".")[0], "built_at": time.strftime("%H:%M:%S"),
             "stats": twin.db.stats(), "live_tasks": len(twin.db.derive_ledger().open_claims("task")),
+            "db": twin.db,          # the read side, for pages that render a field of facts (see `_scene`)
+            "today": Twin._today_str(),
             # The template asks the server whether the enhancement assets exist rather than trusting a
             # path: a 404 on a stylesheet is silent, and a silent 404 in a product that sells "no hidden
             # failures" is a bug worth a variable.
             "has_static": (ROOT / "web" / "static" / "alibi.css").exists(),
-            "render_ms": None, **ctx})
+            # A page that composes its own opening (the cockpit's WebGL field of facts) opts out of the
+            # generic one instead of hiding it, because a `display:none` heading is a screen-reader
+            # announcement the author forgot to remove. Default is the safe direction: forgetting the flag
+            # costs a duplicate heading, and `smoke.py` fails the run when any page has two `h1`s.
+            "no_hero": ctx.pop("no_hero", False),
+            # Section identity for the rail's proximity signal: an id on the main's first child, so
+            # `alibi.js` can map "what is in view" back to a nav link without inventing a router.
+            "page_slug": name.rsplit(".", 1)[0],
+            "page_eyebrow": None, "render_ms": None,
+            # `present` is the *only* route by which a template may phrase internal state; a Jinja
+            # `{% if verify_state == 'grounded' %}` in a template is how a translation ends up meaning one
+            # thing on Home and another on Review.
+            "present": present, "nav_key": NAV_OF_SLUG.get(name.rsplit(".", 1)[0], ""),
+            "calm": ctx.pop("calm", False),
+            "c_reviews_open": twin.db.one("SELECT COUNT(*) n FROM review_item WHERE status='open'")["n"],
+            "c_conflicts": twin.db.one("SELECT COUNT(*) n FROM conflict WHERE state='open'")["n"],
+            "c_actions": twin.db.one("SELECT COUNT(*) n FROM action WHERE status='pending'")["n"],
+            "c_mode": twin.cfg.mode, "c_local": twin.cfg.local_model_name or "none",
+            "c_cloud": (getattr(twin.cfg, "cloud_model_name", "") or "off"),
+            **ctx})
         # The footer prints a real number measured on this request. A UI that claims speed it never
         # measured is the thing PART 44 tells us not to write.
         html = body.body.decode()
@@ -198,12 +247,91 @@ def create_app(twin: Twin | None = None) -> FastAPI:
         return HTMLResponse(html.replace("{{RENDER_MS}}", ms))
 
     # ------------------------------------------------------------- pages ----
-    @app.get("/", response_class=HTMLResponse)
+    # The old landing page survives as a *technical* surface: it is the WebGL field of facts, the health
+    # strip and the sync receipt, and the fluid-layer test reads it. It is no longer what a first-time student
+    # sees, because "Ledger · 18 rows · mode rules_only · DEGRADED" is not an answer to "what matters today".
+    @app.get("/technical/cockpit", response_class=HTMLResponse)
     def cockpit(request: Request):
         c = twin.cockpit()
         return page(request, "cockpit.html", c=c, sync=state.last_sync, health=state.health(),
                     risks=twin.forecasts()[:6], timeline=twin.timeline(8),
                     reviews=twin.db.reviews("open", 6), actions=twin.db.actions()[:6])
+
+    # ── the six destinations ──────────────────────────────────────────────────────────────────────────
+    # Home, Calendar, Tasks, Evidence, Review, Settings. Each renders a *calm* page (no hero field, no
+    # scroll-linked motion: see `calm` in the context) from `Presentation`, which reads the same rows every
+    # technical page reads. Nothing is assembled from literals here: if a number appears on these pages it
+    # came out of the ledger on this request.
+    @app.get("/", response_class=HTMLResponse)
+    def home(request: Request):
+        """An empty ledger is not a broken product and will not be padded with sample rows: it gets one
+        sentence and one button. `?demo=0` (or a direct visit to /onboard) is the same view."""
+        if request.query_params.get("demo") is None and \
+                twin.db.one("SELECT COUNT(*) n FROM source")["n"] == 0:
+            return RedirectResponse("/onboard", status_code=302)
+        q = (request.query_params.get("ask") or "").strip()[:400]
+        return page(request, "home.html", calm=True, h=present.home(), attention=present.attention(),
+                    health=state.health(), trust=present._trust_words(),
+                    ask=(present.ask(q) if q else None),
+                    ask_suggestions=present._suggestions(), ask_q=q,
+                    demo=request.query_params.get("demo") == "1")
+
+    @app.get("/onboard", response_class=HTMLResponse)
+    def onboard(request: Request):
+        return page(request, "onboard.html", calm=True,
+                    n_sources=twin.db.one("SELECT COUNT(*) n FROM source")["n"],
+                    routing=twin.routing(), health=state.health())
+
+    @app.get("/calendar", response_class=HTMLResponse)
+    def calendar(request: Request, view: str = "month", day: str | None = None):
+        return page(request, "calendar.html", calm=True, cal=present.calendar(), view=view,
+                     focus=present.day(day) if day else None)
+
+    @app.get("/tasks", response_class=HTMLResponse)
+    def tasks(request: Request, course: str = "", state_f: str = ""):
+        all_cards = present.task_cards()
+        cards = all_cards
+        if course:
+            cards = [c for c in cards if c["course"].lower() == course.lower()]
+        if state_f == "open":
+            cards = [c for c in cards if c["state"] != "done"]
+        elif state_f == "past":
+            cards = [c for c in cards if c["overdue"]]
+        elif state_f == "done":
+            cards = [c for c in cards if c["state"] == "done"]
+        plan = present._plan_words((twin.run_pipeline().get("feasibility") or {}), {})
+        return page(request, "tasks.html", calm=True, cards=cards, cards_all=all_cards, plan=plan,
+                    course=course, state_f=state_f,
+                    all_courses=sorted({c["course"] for c in all_cards}))
+
+    @app.get("/evidence", response_class=HTMLResponse)
+    def evidence(request: Request, q: str = "", subject: str = ""):
+        return page(request, "evidence.html", calm=True, ev=present.evidence(q=q, subject=subject),
+                    subject=subject, q=q,
+                    lineage=present.db.lineage(subject) if subject else None)
+
+    @app.get("/review", response_class=HTMLResponse)
+    def review(request: Request):
+        twin.db.sync_conflicts()
+        return page(request, "review.html", calm=True, rv=present.review())
+
+    @app.post("/api/ask")
+    async def api_ask(request: Request):
+        """Grounded answers, computed from the ledger. No model call on this path — an answer that arrived
+        from a language model could not be shown with a receipt, and that is the one thing this product
+        promises about its own text."""
+        body = await request.json() if (request.headers.get("content-type") or "").startswith(
+            "application/json") else dict(await request.form())
+        text = str(body.get("q") or "").strip()[:400]
+        if not text:
+            return JSONResponse({"ok": False, "answer": "Ask something.", "receipts": []}, status_code=422)
+        return JSONResponse(present.ask(text))
+
+    @app.get("/technical", response_class=HTMLResponse)
+    def technical(request: Request):
+        """The index of everything deliberately kept out of the main navigation. Not a hiding place: every
+        route below is documented, linked from here, and reachable by URL."""
+        return page(request, "advanced.html", calm=True, groups=NAV_ADVANCED, st=twin.db.stats())
 
     @app.get("/twin", response_class=HTMLResponse)
     def twin_graph(request: Request, subject_id: str | None = None):
@@ -369,13 +497,60 @@ def create_app(twin: Twin | None = None) -> FastAPI:
         return rep.as_dict()
 
     @app.post("/api/review/{rid}/resolve")
-    def api_review(rid: int, decision: str = Form(...), chosen: str = Form(""), note: str = Form(""),
-                   predicate: str = Form("due_at")):
+    def api_review(rid: int, decision: str = Form("use"), chosen: str = Form(""), note: str = Form(""),
+                   predicate: str = Form("due_at"), chosen_index: int = Form(-1)):
+        """`decision` defaults to `use` rather than being required: the calm Review sheet's primary verb is
+        "the student picked one of these", and a submit that arrives without a decision (a programmatic
+        `FormData` send, a browser that dropped the clicked button because the form was submitted by script)
+        must not become a 422 about a field the user never had to fill in. An *unknown* decision still cannot
+        damage the ledger — `db.resolve_review` maps every verb onto one of the four legal statuses."""
         row = twin.db.one("SELECT * FROM review_item WHERE id=?", (rid,))
         if not row:
             raise HTTPException(404, "no such review item")
+        # A candidate option is a JSON value; in an `<input value="…">` its quotes truncate the attribute, so
+        # the queue posts the option's *index* and the value is read back from the row the server already
+        # trusts. `chosen` stays supported, for the API and for the free-text "my own answer" path.
+        if chosen_index >= 0:
+            opts = row["options"] if isinstance(row.get("options"), list) else []
+            if not opts:
+                try:
+                    opts = json.loads(row["options_json"] or "[]")
+                except (ValueError, TypeError, KeyError):
+                    opts = []
+            if chosen_index >= len(opts):
+                raise HTTPException(422, f"review {rid} has {len(opts)} option(s); index {chosen_index} "
+                                         "is not one of them")
+            o = opts[chosen_index]
+            chosen = o if isinstance(o, str) else json.dumps(o, ensure_ascii=False)
+        if decision in ("use", "choose"):
+            # The Review sheet's one button per candidate. `chosen_index` has already resolved to the option
+            # object above, so this is the same write the technical queue performs — one implementation of
+            # "the student picked this", not a second copy that can drift.
+            twin.db.resolve_review(rid, decision="approve",
+                                   chosen=(json.loads(chosen) if chosen[:1] in "{[" else chosen) or None,
+                                   consequence=note or "chosen from the Review sheet")
+            twin.db.sync_conflicts()
+            return {"ok": True, "id": rid, "decision": "approved"}
+        if decision in ("later", "defer"):
+            # "I'll decide later" must not be a silent dismissal: the item is `expired` (it leaves the queue,
+            # it is not counted as an answer) and the reason is on the row. An inbox that pretends you answered
+            # is worse than an inbox that nags.
+            twin.db.resolve_review(rid, decision="defer", chosen=None,
+                                   consequence=note or "postponed by the student; no date was chosen")
+            return {"ok": True, "id": rid, "decision": "deferred"}
         if decision == "accept_safety":
-            twin.db.resolve_review(rid, decision="approve", chosen={"rule": "earliest_safe"},
+            # The conflicts page posts the value it intends to plan against. Decoding it (rather than
+            # storing the form string) keeps `review_item.resolution` machine-readable, and a payload that
+            # is not JSON is refused instead of being written as a mangled quote — the same rule the
+            # verifier applies to a model's output, applied to a browser's.
+            payload: object = {"rule": "earliest_safe"}
+            if chosen:
+                try:
+                    payload = json.loads(chosen)
+                except ValueError:
+                    raise HTTPException(422, "the accept_safety payload must be JSON; what arrived was "
+                                             f"{chosen[:80]!r}")
+            twin.db.resolve_review(rid, decision="approve", chosen=payload,
                                    consequence=note or "planned against the safe value")
         elif decision == "keep_own":
             # "use my answer" used to be a label over a `review_item.resolution` write: the queue closed,
@@ -391,8 +566,18 @@ def create_app(twin: Twin | None = None) -> FastAPI:
             return {"ok": True, "id": rid, "recorded": True, "claim_id": out.get("claim_id"),
                     "shape": out.get("shape"), "value": out.get("value")}
         else:
-            twin.db.resolve_review(rid, decision=decision, chosen=chosen or None,
-                                   consequence=note)
+            # A candidate arrives as a JSON *string* (that is what a form field carries). Decoding it before
+            # the write keeps `review_item.resolution` a JSON object on disk instead of a string containing
+            # JSON, which is the difference between "the reviewer chose 9 Nov" being queryable and being a
+            # blob. Anything that is not JSON — a dismissal with no payload, a stray manual POST — is stored
+            # verbatim rather than rejected, because the decision itself is the record there.
+            stored: object = chosen or None
+            if isinstance(stored, str) and stored[:1] in ("{", "["):
+                try:
+                    stored = json.loads(stored)
+                except ValueError:
+                    pass
+            twin.db.resolve_review(rid, decision=decision, chosen=stored, consequence=note)
         twin.db.sync_conflicts()
         return {"ok": True, "id": rid}
 
@@ -458,19 +643,35 @@ def create_app(twin: Twin | None = None) -> FastAPI:
 
     @app.get("/api/export/twin.ics")
     def export_ics():
+        """The calendar a student imports must read like their term, not like a database dump: the obligation's
+        name, its weight, the course as CATEGORIES, and the claim id in the description so any entry can be
+        traced back to the document that produced it. Undated obligations are left out — a calendar entry with
+        an invented date is exactly the thing this product refuses to do."""
         from .ingest import build_ics
+        from .present import course_for, title_for
         L = twin.db.derive_ledger()
-        events = []
-        for c in L.open_claims("task", None, "due_at"):
-            d = str(c.value.get("date", ""))[:10]
+        rows = L.open_claims("task", None, "due_at")
+        events, undated = [], 0
+        for c in rows:
+            d = str((c.value or {}).get("date", ""))[:10]
             if len(d) != 10:
+                undated += 1
                 continue
             w = L.safe_value("task", c.subject_id, "weight", twin.policy) or {}
-            events.append({"uid": f"{c.subject_id}@alibi", "summary": f"{c.subject_id.replace('_', ' ')}"
-                           + (f" ({w['weight'] * 100:.0f}%)" if w.get("weight") else ""),
-                           "dtstart": d, "description": f"planned against evidence-backed claim "
-                                                         f"{c.id} (source: {c.source_id})"})
-        return PlainTextResponse(build_ics(events), media_type="text/calendar")
+            # `title_for(…, claims)` prefers a title claim's value; `derive_ledger()` hands back `Claim`
+            # objects, not rows, and `title_for` speaks dict — so the second argument stays empty here and the
+            # promoted name comes from the subject key, exactly as the twin page computes it.
+            title = title_for(c.subject_id)
+            events.append({"uid": f"{c.subject_id}@alibi",
+                           "title": title + (f" ({w['weight'] * 100:.0f}%)" if w.get("weight") else ""),
+                           "date": d, "course": course_for(c.subject_id),
+                           "description": f"ALIBI · evidence-backed claim {c.id} "
+                                          f"(source {c.source_id}); edit nothing here, change the source"})
+        body = build_ics(events)
+        if undated:
+            # a comment, not a silent drop: the file says what it left out and why
+            body = body.replace("END:VCALENDAR", f"X-ALIBI-UNDATED:{undated} obligation(s) omitted\r\nEND:VCALENDAR")
+        return PlainTextResponse(body, media_type="text/calendar")
 
     @app.get("/api/plan/draft-extension")
     def api_draft(task: str, remedy_days: int = 1):
@@ -738,22 +939,165 @@ def _badge(text: str, tone: str = "") -> Markup:
     """A status word with a colour, and nothing else: the badge never carries information the row
     does not, so a reviewer can read the text and ignore the colour if they distrust my CSS."""
     cls = _TONES.get(tone if tone in _TONES else ("info" if "sim" in text.lower() else ""), "b-none")
-    return Markup(f'<span class="badge {cls}">{escape(str(text))}</span>')
+    return Markup(f'<span class="badge {cls}">') + str(text) + Markup('</span>')
+    # `Markup(f'…{escape(x)}…')` is a trap: the f-string runs *before* Markup() sees it, so the pre-escaped
+    # `&lt;` is treated as literal text and a `|safe` site renders it as visible markup. Building it with
+    # Markup's own `+` escapes the plain str operand exactly once, which is what the class actually means.
 
 
 def _pill(text: str, tone: str = "") -> Markup:
     cls = _TONES.get(tone, "")
-    return Markup(f'<span class="pill {cls}">{escape(str(text))}</span>')
+    return Markup(f'<span class="pill {cls}">') + str(text) + Markup('</span>')
 
 
-def _stat(value: object, label: str, note: str = "", tone: str = "") -> Markup:
+def _stat(value: object, label: str, note: str = "", tone: str = "", lead: bool = False) -> Markup:
+    """A figure: a number standing in the room, not a card holding one.
+
+    `lead` marks the one number the screen is judged on (false trust on the cockpit, verifier pass rate on
+    eval). It is larger, and it is the only figure allowed to react to the pointer — a page where eight
+    numbers lean toward the cursor is not responsive, it is noisy. The tone travels as a *data attribute*
+    rather than only a colour class, so a stylesheet that wants to express it a different way (high
+    contrast, print, a future light theme) can do it in CSS without touching Python.
+    """
     cls = _TONES.get(tone, "b-none")
-    note_html = f'<div class="mini">{escape(note)}</div>' if note else ""
-    return Markup(f'<div class="stat {cls}"><b>{escape(str(value))}</b>'
-                  f'<span>{escape(label)}</span>{note_html}</div>')
+    data = f' data-tone="{escape(tone)}"' if tone in ("ok", "warn", "bad", "info") else ""
+    inter = ' data-magnet="0.10" data-cursor="read" data-reveal' if lead else ' data-reveal'
+    # Markup("").join(...) and an explicit `</div>`: this helper returns an *opening* tag plus its children,
+    # and for a while it never closed them. Inside a hero the browser then nested every figure inside the
+    # previous one (lead 1217 px tall, the whole `hero-meta` row swallowed as a grandchild) — a layout bug
+    # that no status-code test can see, only a DOM-shape test can.
+    parts = [Markup(f'<div class="stat figure {cls}{" figure--lead" if lead else ""}"{data}{inter}>'),
+             Markup('<span class="n">'), str(value), Markup('</span>'),
+             Markup('<span class="k">'), label, Markup('</span>')]
+    if note:
+        parts += [Markup('<span class="d">'), note, Markup('</span>')]
+    parts.append(Markup('</div>'))
+    return Markup("").join(parts)
 
 
-TEMPLATES.env.globals.update(badge=_badge, pill=_pill, stat=_stat)
+def _scene_rows(db, limit: int = 80) -> tuple[list[dict], list[dict], dict]:
+    """The single source of truth for the field of facts: node list, edge list, counts. Both the markup the
+    human reads and the JSON the canvas consumes come out of here, in this order."""
+    import json
+    from datetime import date
+
+    st = db.stats()
+    rows = db.open_claims()[:limit]
+    conflict_keys = {(r["subject_type"], r["subject_id"], r["predicate"])
+                     for r in db.q("SELECT subject_type, subject_id, predicate FROM conflict WHERE state='open'")}
+    # The same clock the feasibility proof uses — `ALIBI_TODAY` when the demo pins a date, wall time
+    # otherwise. A field where "soonest" disagreed with the solver's horizon would be a lie in a nicer font.
+    try:
+        today_ref = date.fromisoformat(Twin._today_str())
+    except Exception:                                 # pragma: no cover - defensive
+        today_ref = date.today()
+
+    nodes: list[dict] = []
+    for r in rows:
+        key = (r["subject_type"], r["subject_id"], r["predicate"])
+        state = ("conflict" if key in conflict_keys
+                 else "review" if r["verify_state"] != "grounded" else "grounded")
+        value = r["value"] if isinstance(r["value"], dict) else {"v": r["value"]}
+        due: float | None = None
+        iso = str(value.get("date") or "")
+        if r["predicate"] == "due_at" and len(iso) >= 10:
+            try:
+                due = round((date.fromisoformat(iso[:10]) - today_ref).days, 1)
+            except ValueError:
+                due = None
+        prov = db.one("SELECT authority FROM claim_provenance WHERE claim_id=?", (r["id"],))
+        nodes.append({"id": r["id"], "s": r["subject_id"], "p": r["predicate"],
+                      "v": _short(_human_value(value)),
+                      "k": state,
+                      "a": round(float(prov["authority"]), 2) if prov and prov["authority"] is not None else None,
+                      "d": due, "u": f"/claims#c{r['id']}"})
+
+    ids = {n["id"] for n in nodes}
+    edges: list[dict] = []
+    seen: set[tuple] = set()
+    for subject in {n["s"] for n in nodes}:
+        for e in db.lineage(subject).get("edges", []):
+            pair = (e.get("from"), e.get("to"))
+            if pair[0] in ids and pair[1] in ids and pair not in seen:
+                seen.add(pair)
+                edges.append({"f": pair[0], "t": pair[1], "k": e.get("kind") or "lineage"})
+        if len(edges) >= 160:
+            break
+
+    counts = {"grounded": 0, "review": 0, "conflict": 0}
+    for n in nodes:
+        counts[n["k"]] += 1
+    stats = {**counts, "rows": len(db.open_claims()), "verified": st["claims_verified"],
+             "today": today_ref.isoformat()}
+    return nodes, edges[:160], stats
+
+
+def _scene(db, limit: int = 80) -> Markup:
+    """The cockpit's field of facts: one node per live claim, laid out by subject, height and colour, all of
+    it derived from rows. Nothing here is invented for looks — if a claim does not exist no dot is drawn, and
+    an empty ledger draws an empty field (the CSS says so in words).
+
+    Geometry carries meaning, which is why it is worth the shader:
+        angle around the ring   one cluster per subject, so a cluster *is* a course/task group
+        height                  how soon the obligation bites, measured from the same `today` the solver uses
+        colour                  grounded / awaiting a human / in conflict — the three states the tables use
+        a line between nodes    a recorded supersession or dependency edge, not a decorative constellation
+    `scene.js` reads the JSON block; the focusable list beside it is the accessible equivalent, built from the
+    same rows in the same order, so the two cannot disagree.
+    """
+    nodes, edges, stats = _scene_rows(db, limit)
+    caption = (f'{len(nodes)} live claim(s) drawn from {stats["rows"]} row(s) · '
+               f'{stats["conflict"]} in conflict · {stats["review"]} awaiting a human · '
+               f'height measured from {stats["today"]} · '
+               f'{len(edges)} recorded supersession/dependency edge(s)')
+    # `Markup("").join(...)`, not `"".join(...)`: a plain-str list joined into a Markup expression is escaped
+    # as if it were user text, which turns the whole accessible list into visible `&lt;a href&gt;` soup.
+    links = Markup("").join(
+        Markup(f'<a href="{n["u"]}" data-claim="{n["id"]}">') + n["s"]
+        + Markup(' <span class="facts">') + n["p"] + Markup('</span> <span class="mini">')
+        + n["v"] + Markup('</span></a>')
+        for n in nodes[:40])
+    return (Markup('<figure class="scene" data-cursor="open">'
+                   '<canvas aria-hidden="true" role="presentation"></canvas>'
+                   '<figcaption class="scene-legend"><span>')
+            + caption + Markup('</span></figcaption>')
+            + Markup('<div class="scene-tip" role="presentation"></div>'
+                     '<div class="scene-index" aria-label="the same claims as a list">')
+            + links + Markup('</div></figure>'))
+
+
+def _scene_payload(db, limit: int = 80) -> dict:
+    """The geometry data behind `scene()`'s canvas, returned as a plain dict so the *template* serialises it
+    with Jinja's `|tojson`. That matters: `Markup('<script>') + json + Markup('</script>')` runs markupsafe's
+    quote escaping over the JSON (it escapes `"` in every context, including inside a script element), and a
+    `&#34;` inside JSON is a parse error, so the field would silently render nothing. One source of truth
+    (`_scene_rows`) feeds both the markup and the data, so the list and the dots cannot disagree."""
+    rows, edges, stats = _scene_rows(db, limit)
+    return {"claims": rows, "edges": edges, "stats": stats}
+
+
+def _human_value(value: object) -> str:
+    """A dict of claim value fields, printed the way the ledger reads it (`15%`, `2026-10-16`), not as JSON.
+    The canvas tooltip and the accessible list both use it; neither may show `{"weight": 0.15}` to a human."""
+    if isinstance(value, dict):
+        for key in ("date", "text", "value", "pct", "hours"):
+            if value.get(key) is not None:
+                return str(value[key])
+        return " · ".join(f"{k}={v}" for k, v in sorted(value.items())) or "—"
+    return "—" if value is None else str(value)
+
+
+def _short(value: object) -> str:
+    """A display string for a node tooltip, clipped: the full value is one tap away on the claim row."""
+    import json as _json
+    if value is None:
+        return "—"
+    s = value if isinstance(value, str) else _json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return (s[:38] + "…") if len(s) > 39 else s
+
+
+TEMPLATES.env.globals.update(badge=_badge, pill=_pill, stat=_stat, scene=_scene,
+                              scene_payload=_scene_payload)
 
 
 def build_app(*, db_path: str | None = None, seed: bool = True) -> tuple[FastAPI, AppState]:

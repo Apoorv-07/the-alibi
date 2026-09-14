@@ -1,12 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Feasibility{% endblock %}
-{% block body %}
-<h1>Feasibility</h1>
-<p class="sub">CP-SAT answers a question no LLM can: does <i>any</i> schedule exist that satisfies every
-  deadline, eligibility floor, release dependency and sleep cap you are under? When the answer is no, it
-  is a <b>proof</b>, not a forecast — and the unsat core says which facts are jointly impossible.</p>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">cp-sat · {{ f.status or 'not run' }} · {{ tasks | length }} task(s) in the horizon</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">A proof,<br>not a <em>feeling</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">CP-SAT answers a question no LLM can: does <i>any</i> schedule exist that satisfies every deadline, eligibility floor, release dependency and sleep cap you are under? When the answer is no, it is a <b>proof</b> — and the unsat core says which facts are jointly impossible.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">The unsat core is found by deletion, not by description.</p>
+      <p class="mini" style="margin-top:10px">The solver removed one constraint at a time and re-ran; what remains is the smallest set that is still impossible. Removing any single one makes the plan feasible again — that is why the remedy list is short instead of speculative.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
 
-<div class="grid g4" style="margin-bottom:12px">
+{% block body %}
+
+<div class="hero-figures" style="margin-bottom:8px">
   {{ stat(tasks | length, 'tasks in horizon', 'only grounded due dates enter the model') }}
   {{ stat(f.status or 'UNKNOWN', 'solver status', f.solves ~ ' solve(s) this run',
            'bad' if f.status=='INFEASIBLE' else ('ok' if f.status=='FEASIBLE' else 'warn')) }}
@@ -15,7 +27,7 @@
 </div>
 
 {% if f.status == 'INFEASIBLE' %}
-<div class="notice bad">
+<div class="notice bad" data-reveal>
   <b>PROVEN INFEASIBLE</b> — {{ f.head_line }}. This sentence contains no probability: the solver
   exhausted the search under {{ f.core | length }} binding constraint(s).
 </div>
@@ -57,8 +69,9 @@
     <div class="row">
       {% if tasks %}
       <form class="inline" method="get" action="/api/plan/draft-extension">
-        <select name="task">{% for t in tasks %}<option>{{ t.id }}</option>{% endfor %}</select>
-        <input name="remedy_days" value="1" size="2">
+        <select name="task" aria-label="which obligation to draft a request for">
+          {% for t in tasks %}<option>{{ t.id }}</option>{% endfor %}</select>
+        <input name="remedy_days" value="1" size="2" aria-label="days being requested">
         <button>draft the request (needs your approval)</button>
       </form>
       {% endif %}

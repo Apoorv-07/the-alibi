@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Docs{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">served from this repository</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">The docs are<br>a <em>dependency</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Served from the repository, so the running demo and the written claims cannot drift apart. If a doc describes something that does not exist, deleting the doc is the fix.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">Two paragraphs, on purpose.</p>
+      <p class="mini" style="margin-top:10px">One for what the system is, one for what it refuses to be — because a reviewer who only reads the marketing text will find the missing half later, in production.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Docs</h1>
-<p class="sub">Served from the repository, so the running demo and the written claims cannot drift apart.
-  If a doc describes something that does not exist, deleting the doc is the fix.</p>
+
 <div class="panel">
 {% for d in docs %}
   <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">

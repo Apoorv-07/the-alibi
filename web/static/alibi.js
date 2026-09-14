@@ -20,6 +20,7 @@
       layer.className = "toast-layer";
       layer.setAttribute("role", "status");
       layer.setAttribute("aria-live", "polite");
+      layer.setAttribute("aria-label", "notifications");
       document.body.appendChild(layer);
     }
     var el = document.createElement("div");
@@ -34,8 +35,8 @@
     }
     var close = document.createElement("button");
     close.textContent = "dismiss";
-    close.className = "mini";
-    close.style.cssText = "justify-self:start;background:none;border:0;color:#7d8ea3;padding:0";
+    close.className = "toast-dismiss mini";
+    close.setAttribute("aria-label", "dismiss this message");
     close.addEventListener("click", function () { kill(el); });
     el.appendChild(close);
     layer.appendChild(el);
@@ -45,7 +46,7 @@
   function kill(el) {
     if (!el || !el.parentNode) return;
     el.classList.add("out");
-    setTimeout(function () { el.remove(); }, 200);
+    setTimeout(function () { el.remove(); }, reduced ? 0 : 200);   // with motion off, it simply leaves
   }
 
   /* An error from this app is never a bare status code: the API returns `detail` sentences that name the
@@ -242,4 +243,68 @@
       setTimeout(function () { anchor.style.background = ""; }, 1400);
     }
   }
+
+  /* ------------------------------------------- presence (§ of the brief) ---- */
+  /* Three categories of motion, deliberately separated so the page never becomes exhausting:
+       ambient    — the shader and the orbs; slow, paused when the tab is hidden
+       interactive — springs, magnetism, the cursor; they only move when you move
+       narrative  — reveals and the section signal below; they fire once, on arrival
+     Nothing in this block animates on a timer. */
+  function presence() {
+    var A = window.ALIBI;
+    if (!A || A.reduced()) return;
+    var rail = document.querySelector(".rail") || document.querySelector("nav");
+    var links = rail ? [].slice.call(rail.querySelectorAll("a[href^='/']")) : [];
+    var heads = [].slice.call(document.querySelectorAll("[data-section], h2, .strip, .scene-head"));
+    if (!links.length || !heads.length) return;
+    heads.forEach(function (h, i) { if (!h.id) h.id = "s-" + i; });
+    var seen = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        seen[en.target.id] = en.isIntersecting ? en.intersectionRatio : 0;
+      });
+      var best = null, bestScore = 0;
+      heads.forEach(function (h) {
+        var s = seen[h.id] || 0;
+        if (s > bestScore) { bestScore = s; best = h; }
+      });
+      if (!best) return;
+      // A nav href is a *path*, not a selector: `best.closest("/")` is a SyntaxError, and it cost this page a
+      // console error on every scroll. Resolve the path to the element it points at, then compare ancestors.
+      var link = null;
+      links.forEach(function (a) {
+        var href = a.getAttribute("href").split("?")[0];
+        var target = href === "/" ? document.getElementById("page-") : null;
+        if (!target) target = document.getElementById("page-" + href.replace(/^\/+|\/+$/g, ""));
+        if (target && (target === best || target.contains(best))) link = a;
+      });
+      if (link) rail.querySelectorAll("a").forEach(function (a) { a.dataset.near = a === link ? "1" : "0"; });
+    }, { threshold: [0, .15, .4, .8] });
+    heads.forEach(function (h) { io.observe(h); });
+  }
+
+  /* Objects with `data-tilt` lean toward the pointer in 3D. Applied only where the object is a thing you
+     can open (a conflict, a review item) — a page where every surface tilts is a page with no hierarchy. */
+  function tilt() {
+    if (window.ALIBI && window.ALIBI.reduced()) return;
+    if (!(window.matchMedia && window.matchMedia("(hover: hover)").matches)) return;
+    [].slice.call(document.querySelectorAll(".obj[data-cursor], .figure--lead")).forEach(function (el) {
+      if (el._tilt) return; el._tilt = 1;
+      el.style.setProperty("--tilt-persp", "900px");
+      el.addEventListener("pointermove", function (e) {
+        var r = el.getBoundingClientRect();
+        el.style.setProperty("--tiltx", (((e.clientY - r.top) / r.height - .5) * -4).toFixed(2) + "deg");
+        el.style.setProperty("--tilty", (((e.clientX - r.left) / r.width - .5) * 5).toFixed(2) + "deg");
+      });
+      el.addEventListener("pointerleave", function () {
+        el.style.setProperty("--tiltx", "0deg"); el.style.setProperty("--tilty", "0deg");
+      });
+    });
+  }
+
+  /* On a fluid navigation the enhancement layer has to be re-applied by hand: `motion.js` swapped the body,
+     which by design does not re-run scripts. Same for the first paint. */
+  function enhance() { presence(); tilt(); if (window.ALIBI && window.ALIBI.refresh) window.ALIBI.refresh(); }
+  if (document.readyState !== "loading") enhance(); else document.addEventListener("DOMContentLoaded", enhance);
+  document.addEventListener("alibi:page", enhance);
 })();

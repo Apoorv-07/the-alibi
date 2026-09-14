@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_ui.html" import attention_item, task_card, empty, plan_words, answer, status_line %}
+{% block title %}Today{% endblock %}
+
+{% block hero scoped %}
+<header class="head">
+  <p class="kicker">{{ h.today_long }}</p>
+  <h1>{{ h.greeting }}</h1>
+  <p class="lede">
+    {% if h.attention_count %}{{ h.attention_reason }} Everything else on this page is background you can
+    ignore safely.{% else %}Nothing in your sources needs you today. ALIBI re-reads them whenever you ask,
+    and it will not invent an emergency to fill the space.{% endif %}
+  </p>
+</header>
+{% if ask %}{{ answer(ask) }}{% endif %}
+{% endblock %}
+
+{% block body %}
+{# The whole page is four questions in order: what needs me · what is on · what is next · what changed.
+   A trust line and a plan verdict, both computed, and no metric that answers none of them. #}
+
+{% if h.attention %}
+<section class="sec" aria-labelledby="att-h">
+  <h2 id="att-h">{{ h.attention_reason }}</h2>
+  <ul class="att-list">
+    {% for it in h.attention %}{{ attention_item(it) }}{% endfor %}
+  </ul>
+  {% if h.attention_count > h.attention | length %}
+  <p class="mini"><a class="act" href="/review">See all {{ h.attention_count }} →</a></p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="sec" aria-labelledby="week-h">
+  <h2 id="week-h">This week</h2>
+  {% if h.today_items or h.this_week %}
+  <ol class="stack">
+    {% for c in h.today_items + h.this_week %}{{ task_card(c) }}{% endfor %}
+  </ol>
+  <p class="mini">
+    <a class="act" href="/calendar">Open the calendar</a> ·
+    <a class="act" href="/tasks">All {{ h.today_items | length + h.this_week | length }} items due this week</a>
+  </p>
+  {% else %}
+  {{ empty("Nothing is due in the next seven days.",
+           "ALIBI only lists a deadline when a source states it. If you expected something here, the date is
+            either not on file or it is further out than this week.",
+           "See what is on file", "/tasks") }}
+  {% endif %}
+</section>
+
+{% if h.plan and h.plan.state != 'unknown' %}
+<section class="sec" aria-labelledby="plan-sec">{{ plan_words(h.plan) }}</section>
+{% endif %}
+
+{% if h.later or h.no_date %}
+<section class="sec" aria-labelledby="next-h">
+  <h2 id="next-h">Coming up after that</h2>
+  <ol class="stack">
+    {% for c in h.later %}{{ task_card(c) }}{% endfor %}
+  </ol>
+  {% if h.no_date %}
+  <p class="mini">ALIBI also knows about {{ h.no_date | length }} obligation{{ '' if h.no_date | length == 1
+    else 's' }} with no date on file —
+    {% for c in h.no_date %}<a href="/tasks#{{ c.id }}">{{ c.course }} {{ c.title }}</a>{{ ' ·' if not loop.last }}{% endfor %}.
+    They are left out of the week because a guessed date would move your plan for no reason.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if h.changed %}
+<section class="sec" aria-labelledby="chg-h">
+  <h2 id="chg-h">What changed</h2>
+  <ul class="chg">
+    {% for ch in h.changed %}
+    <li><span>{{ ch.line }}</span> <span class="mono faint">{{ ch.at }}</span>
+      {% if ch.detail %}<span class="chg__d">{{ ch.detail }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <p class="mini"><a class="act" href="/timeline">The full change timeline</a> — every supersession, with the
+    source that caused it.</p>
+</section>
+{% endif %}
+
+<section class="sec sec--quiet" aria-labelledby="trust-h">
+  <h2 id="trust-h">Why you can act on this</h2>
+  <p class="trust">{{ h.trust.line }}.</p>
+  {{ status_line(health) }}
+  <p class="mini">
+    {% if h.trust.denominator %}The count above is not a promise: every grounded claim is re-checked against
+    its quote on each read, so a wrong number here would mean the page is lying to you.{% endif %}
+    {% if h.trust.unverifiable %} {{ h.trust.unverifiable }} claim(s) whose raw source text has been purged are
+    reported as unverifiable rather than trusted.{% endif %}
+    <a class="act" href="/technical">Advanced view: claims, verifier, solver, audit</a>
+  </p>
+</section>
+{% endblock %}

@@ -1,11 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Evaluation{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">harness on the shipped code path · generated {{ mtime }}</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Numbers,<br>not <em>adjectives</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Nothing on this page is typed in by hand. Every figure is read out of <code>EVAL_REPORT.json</code>, written by <code>python3 evaluation/harness.py</code> running on <i>this</i> repository — the same ingest, verifier, reconciler and solver the UI uses. The page renders the file instead of restating it, so it cannot drift from the harness and cannot flatter the product.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">If a number here is wrong, the fix is the harness.</p>
+      <p class="mini" style="margin-top:10px">Not the sentence next to it. That is why this screen renders a file and refuses to render a memory: see the red panel below when the file is missing.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Evaluation</h1>
-<p class="sub">Nothing on this page is typed in by hand. Every number is read out of
-  <code>EVAL_REPORT.json</code>, written by <code>python3 evaluation/harness.py</code> running on
-  <i>this</i> repository — the same ingest, verifier, reconciler and solver the UI uses. The page renders
-  the file instead of restating it, so it cannot drift from the harness and cannot flatter the product.</p>
 
 {% if not has_report %}
 <div class="notice bad">No <code>EVAL_REPORT.json</code> on disk. Run <code>python3
@@ -22,7 +33,7 @@
 {% set base = report.baseline_naive_transcription or {} %}
 {% set cor = report.corpus or {} %}
 
-<div class="grid g4" style="margin-bottom:12px">
+<div class="hero-figures" style="margin-bottom:8px">
   {{ stat(o.claims_emitted or '—', 'claims emitted', 'gold path, on ' ~ (cor.blocks or '?') ~ ' corpus blocks') }}
   {{ stat(((o.verifier_pass_rate or 0) * 100) | round(1) ~ '%', 'verifier pass rate',
           'quotes re-found in their own source byte-for-byte', 'ok') }}

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -24,8 +25,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _twin(args) -> Twin:
-    twin = Twin.open(args.db or os.environ.get("ALIBI_DB", str(ROOT / "alibi.db")),
-                     mode=args.mode)
+    path = args.db or os.environ.get("ALIBI_DB", str(ROOT / "alibi.db"))
+    try:
+        twin = Twin.open(path, mode=args.mode)
+    except (sqlite3.Error, OSError) as e:
+        # A ledger that cannot be opened is the one failure a CLI must explain rather than trace. Two
+        # situations reach here: another process (a running server, which keeps the WAL open) and a
+        # half-deleted database — `rm alibi.db` while a server holds it strands the -wal and -shm files, and
+        # every later open reports "disk I/O error". Both have a two-word fix, and no traceback says what it is.
+        sys.exit(
+            f"alibi: cannot open the ledger at {path}\n"
+            f"       {type(e).__name__}: {e}\n"
+            "       If a server is running, either talk to it instead of opening the same file\n"
+            "         (the web UI's 'Read my sources again' button is this command's write path),\n"
+            "         or point the CLI at a copy: --db /tmp/check.db\n"
+            "       If the file was deleted while something had it open, remove the stranded\n"
+            "         journal too: rm -f <db> <db>-wal <db>-shm, then `make seed`.\n"
+            "       Nothing was written by this attempt."
+        )
     from .log import configure
     configure(twin.cfg)                 # LOG_LEVEL / ALIBI_LOG_JSON are read by Config, so honour them
     return twin
@@ -51,8 +68,13 @@ def cmd_status(t: Twin, args) -> int:
           f" · actions pending {c['actions_pending']}")
     print(f"  model calls {st['model_calls']} (local {st['local_calls']}, cloud {st['cloud_calls']},"
           f" {st['cloud_bytes']} bytes out) · invalid outputs {st['invalid_outputs']}")
-    print(f"  FALSE TRUST: {st['false_trust_count']} / {st['claims_verified']} grounded"
-          f" = {st['false_trust_rate'] * 100:.2f}%   (unverifiable: {st.get('unverifiable', 0)})")
+    # same sentence the web UI shows (`present.trust_words`), because the UI and the CLI disagreeing about a
+    # trust figure is the one inconsistency that would cost the product its whole claim
+    from .present import trust_words
+    tw = trust_words(st)
+    print(f"  {tw['line']}"
+          + (f" = {tw['pct']:.2f}%" if tw["pct"] is not None else "")
+          + f"   (unverifiable: {tw['unverifiable']})")
     print(f"  tasks tracked {c['live_tasks']} · {c['changes']['head_line']}")
     if prov["mode"] == "rules_only" or t.routing().get("simulated"):
         print("  note: no language model is installed; extraction ran on the offline deterministic"

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_ui.html" import review_card, empty %}
+{% block title %}Review{% endblock %}
+
+{% block hero scoped %}
+{% set rv = present.review() %}
+<header class="head">
+  <p class="kicker">{{ rv.count }} waiting · nothing here is decided for you</p>
+  <h1>{% if rv.count %}Things only you can answer{% else %}Nothing needs your judgment{% endif %}</h1>
+  <p class="lede">ALIBI keeps a question here when two sources disagree or a fact is too important to guess.
+    Choosing an answer writes it to the ledger with your decision attached; dismissing one leaves the sources
+    exactly as they were.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+{% if rv.cards %}
+<section class="revs" aria-label="questions waiting for you">
+  {% for it in rv.cards %}{{ review_card(it) }}{% endfor %}
+</section>
+{% else %}
+{{ empty("The queue is genuinely empty.",
+         "That means every date in your ledger has one source agreeing with itself, or you have answered the
+          disagreements. ALIBI will not manufacture a review item to make this page look busy.",
+         "See the ledger", "/evidence") }}
+{% endif %}
+
+{% if rv.recent %}
+<section class="sec sec--quiet" aria-labelledby="recent-h">
+  <h2 id="recent-h">Recently answered</h2>
+  <ul class="recent">
+    {% for r in rv.recent %}
+    <li><span>{{ r.line }}</span>
+      {% if r.chosen %}<b>{{ r.chosen }}</b>{% endif %}
+      <span class="tag{% if r.status != 'answered' %} tag--soft{% endif %}">{{ r.status }}</span>
+      <span class="mono faint">{{ r.at }}</span>
+      {% if r.note %}<span class="recent__note">{{ r.note }}</span>{% endif %}
+      {% if r.subject %}<a href="/tasks#{{ r.subject }}">see it in your list</a>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="sec sec--quiet" aria-labelledby="deep-h">
+  <h2 id="deep-h">Prefer the raw disagreement?</h2>
+  <p class="mini">The same items, with claim ids, offsets and both quotes side by side — the machinery this
+    page is a calm answer to. <a class="act" href="/queue">Review queue (technical)</a> ·
+    <a class="act" href="/conflicts">Conflicts (technical)</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Start{% endblock %}
+
+{% block hero scoped %}
+<header class="head">
+  <p class="kicker">first run · nothing on file yet</p>
+  <h1>ALIBI builds a picture of your term from the sources you trust</h1>
+  <p class="lede">Add a document and it reads it exactly: every deadline, weight, rule and date it can quote
+    verbatim becomes a claim, and every claim carries the words it came from. Anything it cannot quote, it
+    does not claim.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+<p class="mini">{{ present._trust_words().line }}</p>
+
+{% if n_sources %}
+<p class="notice">You already have {{ n_sources }} source{{ '' if n_sources == 1 else 's' }} on file.
+  <a class="act" href="/">Go to today</a></p>
+{% endif %}
+<section class="ob">
+  <form method="post" action="/api/ingest" enctype="multipart/form-data" class="ob__form" data-silent="on">
+    <h2>1 · Add a document</h2>
+    <p class="mini">A syllabus, a notice-board photo's text, an exam timetable, an assignment sheet, a chat
+      export. Text files, Markdown and PDFs; up to the configured size limit.</p>
+    <p><label class="field"><span class="field__l">File</span>
+      <input type="file" name="file" accept=".txt,.md,.markdown,.pdf,.csv,.json,text/plain"></label></p>
+    <p><label class="field"><span class="field__l">What is it? (optional — ALIBI guesses from the text)</span>
+      <select name="kind">
+        <option value="auto">detect</option><option value="syllabus">syllabus</option>
+        <option value="notice">notice</option><option value="timetable">timetable</option>
+        <option value="chat">message thread</option>
+      </select></label></p>
+    <p><label class="field"><span class="field__l">A name you will recognise later</span>
+      <input type="text" name="label" placeholder="e.g. Semester 5 · OS syllabus" maxlength="90"></label></p>
+    <button class="btn" type="submit">Read it</button>
+    <p class="hint">Nothing leaves this machine unless you configure a model. The extractor that does the
+      reading is deterministic, and what it cannot quote it discards.</p>
+  </form>
+  <form method="post" action="/api/sync" class="ob__demo">
+    <h2>Or look at a worked example first</h2>
+    <p class="mini">Loads the repository's own sample corpus — six documents, a real conflict, a
+      supersession — and labels every page so you can tell it apart from your data. It is a demo you can
+      read, not a demo that pretends.</p>
+    <input type="hidden" name="demo" value="true">
+    <button class="btn btn--quiet" type="submit">Load the sample corpus</button>
+  </form>
+</section>
+<section class="sec sec--quiet">
+  <h2>What happens next</h2>
+  <ol class="steps">
+    <li><span>ALIBI lists what it found, with the sentence each fact came from.</span></li>
+    <li><span>Where two sources disagree about a date, it asks you instead of choosing.</span></li>
+    <li><span>Your calendar, your list and any risk come from those rows — never from a template.</span></li>
+  </ol>
+</section>
+{% endblock %}

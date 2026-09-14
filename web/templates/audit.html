@@ -1,11 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Audit{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">{{ runs | length }} run(s) · {{ rows | length }} audit row(s) shown</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Every decision,<br>with its <em>cost</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Who changed what, and what each sync cost: calls, bytes and milliseconds per run, aggregated from rows rather than reported by the code that made them.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">Written in the same transaction as the change.</p>
+      <p class="mini" style="margin-top:10px">So an audit entry without a matching row — or the reverse — is a bug we want reported, not a discrepancy to be explained in prose.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Audit &amp; runs</h1>
-<p class="sub">Who changed what, and what each sync cost. The run table is the honest version of
-  "the system is fast": calls, bytes and milliseconds per run, aggregated from rows rather than
-  reported by the code that made them.</p>
-<div class="grid g4" style="margin-bottom:12px">
+
+<div class="hero-figures" style="margin-bottom:8px">
   {{ stat(runs | length, 'runs', 'each is one sync or ingest') }}
   {{ stat(runs | map(attribute="llm_calls") | sum if runs else 0, 'llm calls', 'all time', 'info') }}
   {{ stat(runs | map(attribute="cloud_calls") | sum if runs else 0, 'cloud calls', 'all time', 'warn') }}

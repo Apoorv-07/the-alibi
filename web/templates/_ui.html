@@ -1,0 +1,220 @@
+{% macro attention_item(it) -%}
+{# One thing that needs the student. Written so a reader who never expands the card still knows *what* and
+   *why*: the sentence is a sentence, and the technical identifiers live inside the disclosure. #}
+<li class="att{% if it.urgent %} att--now{% endif %}">
+  <div class="att__body">
+    <p class="att__line">{{ it.line }}</p>
+    <p class="att__why">{{ it.why }}</p>
+    <div class="att__meta">
+      {% if it.course %}<span class="tag">{{ it.course }}</span>{% endif %}
+      {% if it.kind %}<span class="tag tag--kind">{{ it.kind }}</span>{% endif %}
+      {% if it.subject %}<span class="mono faint">{{ it.subject }}</span>{% endif %}
+    </div>
+  </div>
+  <a class="act" href="{{ it.href }}">{{ it.action }}</a>
+</li>
+{%- endmacro %}
+
+
+{% macro task_card(c, expanded=false) -%}
+{# Progressive disclosure, four layers deep and never more than one open:
+   1 headline (course · title · when)  2 what ALIBI thinks (effort, weight, state)
+   3 why (sources, verification)       4 the raw rows, one click and one table away. #}
+<article class="task{% if c.needs_choice %} task--ambiguous{% endif %}{% if c.overdue %} task--past{% endif %}"
+         id="{{ c.id }}">
+  <div class="task__head">
+    <div>
+      <p class="task__course">{{ c.course }}{% if c.state == 'done' %} · done{% endif %}</p>
+      <h3 class="task__title">{{ c.title }}</h3>
+    </div>
+    <p class="task__when">{{ c.when }}</p>
+  </div>
+  <ul class="facts">
+    <li><span>{{ c.effort }}</span>{% if c.minutes_assumed and 'assumed' not in c.effort %}<u title="no source states the effort; the planner's documented default is used">assumed</u>{% endif %}</li>
+    {% if c.weight %}<li><span>{{ '%g%%' % (c.weight * 100) }} of the grade</span></li>{% endif %}
+    <li><span>{{ c.verify }}</span></li>
+    {% if c.risk %}<li><span>{{ c.risk }}{% if c.risk_note %} · {{ c.risk_note }}{% endif %}</span></li>{% endif %}
+  </ul>
+  {% if c.needs_choice %}
+  <p class="task__flag">Two sources give different dates, so ALIBI is not choosing one for you.
+    <a href="/review">Pick the date →</a></p>
+  {% endif %}
+  <details class="deep"{% if expanded %} open{% endif %}>
+    <summary>Why does ALIBI say this?</summary>
+    <dl class="kv">
+      <dt>Sources</dt><dd>{{ c.sources | join(' · ') or 'no source names on file' }}</dd>
+      <dt>Claims</dt><dd>{{ c.n_claims }} row(s){% if c.confidence is not none %} · highest confidence {{ '%.2f' % c.confidence }}{% endif %}</dd>
+      {% if c.due %}<dt>Due, as stored</dt><dd>{{ c.due }}</dd>{% endif %}
+      {% if c.due_dates | length > 1 %}<dt>Dates on file</dt><dd>{{ c.due_dates | join(' / ') }}</dd>{% endif %}
+      {% if c.done_at %}<dt>Handed in</dt><dd>{{ c.done_at }}</dd>{% endif %}
+    </dl>
+    <p class="kv__note">Left as the ledger holds it — a date you can quote, next to the sentence it produced.
+      The human phrasing is in the heading above; the receipts are one click below.</p>
+    <p class="deep__link"><a href="/evidence?subject={{ c.id }}">Open the receipts for {{ c.title }}</a> —
+      every claim, its quote, its source, its verification.</p>
+  </details>
+</article>
+{%- endmacro %}
+
+
+{% macro empty(title, body, action_label='', action_href='') -%}
+{# An empty state says what is missing and what would fill it. Never a decorative card, never a shrug. #}
+<div class="empty">
+  <h3 class="empty__title">{{ title }}</h3>
+  <p class="empty__body">{{ body }}</p>
+  {% if action_label %}<p><a class="act" href="{{ action_href }}">{{ action_label }}</a></p>{% endif %}
+</div>
+{%- endmacro %}
+
+
+{% macro plan_words(plan) -%}
+{# The solver's verdict, phrased. It never says "everything is fine" on its own: it says what was checked. #}
+<section class="plan plan--{{ plan.state }}" aria-labelledby="plan-h">
+  <h2 class="plan__h" id="plan-h">{{ plan.headline }}</h2>
+  <p class="plan__body">{{ plan.body }}</p>
+  {% if plan.fixes %}
+  <p class="plan__fixes-h">ALIBI found {{ plan.fixes | length }} possible
+    adjustment{{ '' if plan.fixes | length == 1 else 's' }}:</p>
+  <ul class="fixes">
+    {% for f in plan.fixes %}
+    <li>
+      <span class="fixes__label">{{ f.label }}</span>
+      <span class="fixes__note {% if f.helps %}is-ok{% endif %}">
+        {{ 'would make it fit' if f.helps else 'would not be enough on its own' }}</span>
+      {% if f.cost %}<span class="fixes__cost">{{ f.cost }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <p class="plan__src"><a href="/feasibility">See the solver's own report</a> — constraints, slack, and what
+    it refused to assume.</p>
+</section>
+{%- endmacro %}
+
+
+{% macro review_card(it) -%}
+<article class="rev" id="review-{{ it.id }}">
+  <p class="rev__kind">{{ it.heading }}{% if it.course %} · {{ it.course }}{% endif %}</p>
+  <h3 class="rev__q">{{ it.question }}</h3>
+  <p class="rev__body">{{ it.body }}</p>
+  {% if it.why %}<p class="rev__why">{{ it.why }}</p>{% endif %}
+  {% if it.options %}
+  <form id="rev-{{ it.id }}" method="post" action="/api/review/{{ it.id }}/resolve" class="rev__opts">
+    {% for o in it.options %}
+    <label class="opt">
+      <input type="radio" name="chosen_index" value="{{ o.i }}" required>
+      <span class="opt__label">{{ o.label }}</span>
+      {% if o.consequence %}<span class="opt__note">{{ o.consequence }}</span>{% endif %}
+    </label>
+    {% endfor %}
+    <label class="field"><span class="field__l">A note for the record (optional — it is stored with the decision)</span>
+      <input type="text" id="note-{{ it.id }}" name="note" maxlength="300"
+             placeholder="e.g. the portal updates at midnight, so the later date is stale"></label>
+    {# Each verb carries its `decision` as a hidden field, not as the submit button's value. A button's value
+       is only sent when that button *was* the click target, so a scripted submit (`form.requestSubmit()`)
+       arrives with no decision at all — and the sheet answered 422 "Field required" for a field the student
+       never saw. The secondary verb lives in its own `<form>` bound by the `form=` attribute, which keeps the
+       radio selection shared and needs no JavaScript. #}
+    <input type="hidden" name="decision" value="use">
+    <div class="rev__actions">
+      <button type="submit">Use that</button>
+      <button type="submit" class="ghost rev__defer-btn" form="defer-{{ it.id }}">I'll decide later</button>
+    </div>
+  </form>
+  {# The secondary verb needs a form of its own (a `<form>` cannot nest), and it borrows the chosen radio
+     through the `form=` attribute on the input — so "later" is recorded against the very date on offer,
+     rather than as a second best with no idea what was being postponed. #}
+  <form id="defer-{{ it.id }}" method="post" action="/api/review/{{ it.id }}/resolve">
+    <input type="hidden" name="decision" value="later">
+    <input type="hidden" name="note" value="" data-mirror="note-{{ it.id }}">
+  </form>
+  {% else %}
+  <form method="post" action="/api/review/{{ it.id }}/resolve" class="rev__opts">
+    <label class="field"><span class="field__l">Your answer</span>
+      <input type="text" name="chosen" placeholder="Type the date, the number, or the words" required></label>
+    <input type="hidden" name="predicate" value="due_at">
+    <input type="hidden" name="decision" value="keep_own">
+    <div class="rev__actions">
+      <button type="submit">Save</button>
+      <button type="submit" class="ghost rev__defer-btn" form="dismiss-{{ it.id }}">Dismiss</button>
+    </div>
+  </form>
+  <form id="dismiss-{{ it.id }}" method="post" action="/api/review/{{ it.id }}/resolve">
+    <input type="hidden" name="decision" value="dismiss">
+  </form>
+  {% endif %}
+  {% if it.evidence %}
+  <details class="deep"><summary>What the sources actually say</summary>
+    <ul class="quotes">
+      {% for e in it.evidence %}
+      <li><p class="mono faint">{{ e.source }}{% if e.at %} · {{ e.at }}{% endif %}</p>
+        <blockquote class="quote">{{ e.quote }}</blockquote></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  <p class="rev__count mono faint">{{ it.n_claims }} claim(s) on file · item {{ it.id }}</p>
+</article>
+{%- endmacro %}
+
+
+{% macro page_head(title, lede, kicker='') -%}
+{# Every human page opens the same way: one line of orientation, one question it answers. The kicker is
+   where a *state* belongs (what today is, how many rows are on file) — never a system-mode readout. #}
+<header class="head">
+  {% if kicker %}<p class="kicker">{{ kicker }}</p>{% endif %}
+  <h1>{{ title }}</h1>
+  {% if lede %}<p class="lede">{{ lede }}</p>{% endif %}
+</header>
+{%- endmacro %}
+
+
+{% macro answer(a) -%}
+{# Ask ALIBI, server-rendered: the question, the sentence, and the rows the sentence came from. A model is
+   not on this path, so the receipt list is not decoration — it *is* the answer's evidence. #}
+<section class="answer" aria-live="polite">
+  <p class="answer__q">You asked: {{ a.question }}</p>
+  <p class="answer__text">{{ a.answer }}</p>
+  {% if a.receipts %}
+  <ul class="receipts">
+    {% for r in a.receipts %}
+    <li>
+      <a class="receipts__l" href="/evidence?subject={{ r.subject }}">{{ r.label }}</a>
+      <span class="receipts__d">{{ r.detail }}</span>
+      {% if r.claims %}<span class="mono faint">claim{{ '' if r.claims|length == 1 else 's' }}
+        {{ r.claims | join(', ') }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mini faint">ALIBI answered from what is on file and found no rows behind that question —
+    so it has not invented any. <a class="act" href="/evidence">Browse the ledger</a></p>
+  {% endif %}
+  <p class="answer__note mono faint">answered by reading the ledger ({{ a.intent }}) · no model call</p>
+</section>
+{%- endmacro %}
+
+
+{% macro status_line(hl) -%}
+{# The 5 % of the page that is about the system, in the same voice as the rest of it. A chip that says
+   "degraded" with no noun is how dashboards make people anxious about nothing: what is translated here is
+   *which part*, and *what still works because of it*. #}
+{% set bad = [] %}
+{% for k, v in (hl.components or {}).items() %}{% if v.state in ('degraded','unavailable','empty','open') %}
+{% if bad.append([k, v]) %}{% endif %}{% endif %}{% endfor %}
+<p class="status">
+  <b class="status__dot status__dot--{{ hl.state }}"></b>
+  {% if not bad %}Everything on this page was produced by a system reporting no problems.{% else %}
+  {% for k, v in bad[:2] %}{{ {'ai': 'No language model is running, so the deterministic reader did the extraction',
+      'ledger': 'Nothing is on file yet, so there is nothing to show you',
+      'queue': 'Some of your items are waiting on a decision from you',
+      'verifier': 'A claim failed re-verification, so ALIBI stopped trusting it',
+      'solver': 'The schedule solver did not run, so no plan is claimed',
+      'egress': 'Something left this machine — see the audit trail',
+      'extraction': 'Some model outputs were refused as malformed',
+      'database': 'The ledger file could not be read'}
+      .get(k, k ~ ' is ' ~ v.state) }}.{{ ' ' if not loop.last }}{% endfor %}{% endif %}
+  <a class="status__m" href="/api/health">{{ hl.state }}</a>
+  <a class="act" href="/technical">every component</a>
+</p>
+{%- endmacro %}

@@ -1,12 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Data routing{% endblock %}
-{% block body %}
-<h1>Data routing</h1>
-<p class="sub">Privacy as an observable state, not a promise: what left this machine, in what shape, under
-  which policy, and what would be sent on the next sync. Every number below is read from
-  <code>model_invocation</code> — if a request had been refused, there is a row saying so.</p>
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">read from <code>model_invocation</code> · {{ stats.cloud_calls }} cloud call(s), {{ stats.cloud_bytes }} bytes out</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Privacy as<br>a <em>row</em>, not a promise.</h1>
+      <p class="sub lede" style="margin-top:20px">What left this machine, in what shape, under which policy, and what would be sent on the next sync. Every number below is a SUM over recorded invocations — if a request had been refused, there is a row saying so.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">The mask is asymmetric on purpose.</p>
+      <p class="mini" style="margin-top:10px">It removes identifiers and keeps the numbers that make the question answerable. A redactor that also ate "12 Oct" would push people back to pasting the raw screenshot into a chatbot, which is the actual privacy failure this system exists to avoid.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
 
-<div class="grid g4" style="margin-bottom:12px">
+{% block body %}
+
+<div class="hero-figures" style="margin-bottom:8px">
   {{ stat(stats.local_calls, 'LOCAL calls', 'nothing crossed a socket', 'ok') }}
   {{ stat(stats.cloud_calls, 'CLOUD calls', 'redacted, capped by budget', 'warn' if stats.cloud_calls else 'ok') }}
   {{ stat(stats.cloud_bytes, 'bytes egressed', 'sum(bytes_out) over cloud rows', 'warn' if stats.cloud_bytes else 'ok') }}
@@ -73,7 +85,7 @@ dates, weights, course codes: KEPT — they are the payload</pre>
     process's environment only.</p>
   <div class="row">
     <form method="post" action="/me/wipe" onsubmit="return confirm('This DELETEs every claim, source, observation and action in this database.')">
-      <input name="confirm" placeholder="type WIPE" size="10" required>
+      <input name="confirm" placeholder="type WIPE" size="10" required aria-label="type WIPE to confirm">
       <button style="background:#2a1414;border-color:#4d1f1f">right to erasure</button>
     </form>
     <span class="mini">The response returns the row counts the database reports after the DELETE, so the

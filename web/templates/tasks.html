@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_ui.html" import task_card, empty, plan_words %}
+{% block title %}Tasks{% endblock %}
+
+{% block hero scoped %}
+{# The header counts describe the WHOLE ledger, the list describes the current filter. They are separate
+   numbers from separate lists on purpose: a page that re-labels "10 open" as "3 open" when you click
+   "Past its date" tells you the filter found things, not how many there are. #}
+{% set all = cards_all %}
+{% set open = all | selectattr('state', 'ne', 'done') | list %}
+{% set past = open | selectattr('overdue') | list %}
+<header class="head">
+  <p class="kicker">{{ open | length }} open · {{ past | length }} past its date ·
+    {{ all | length - open | length }} done{% if course %} · {{ course }} only{% endif %}</p>
+  <h1>Upcoming work</h1>
+  <p class="lede">Every line here is an obligation a source stated, with the effort ALIBI assumed or learned,
+    and a link to the proof. Nothing is sorted by how alarming it sounds.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+{# filter form: GET, so the state is a URL you can send someone, and the buttons are the only markup #}
+<form class="filters" method="get" action="/tasks">
+  {% if course %}<input type="hidden" name="course" value="{{ course }}">{% endif %}
+  <button class="chip{% if state_f == 'open' %} is-on{% endif %}" name="state_f" value="open"
+          {% if state_f == 'open' %}aria-current="true"{% endif %}>Open</button>
+  <button class="chip{% if state_f == 'past' %} is-on{% endif %}" name="state_f" value="past"
+          {% if state_f == 'past' %}aria-current="true"{% endif %}>Past its date</button>
+  <button class="chip{% if state_f == 'done' %} is-on{% endif %}" name="state_f" value="done"
+          {% if state_f == 'done' %}aria-current="true"{% endif %}>Done</button>
+  <button class="chip{% if not state_f %} is-on{% endif %}" name="state_f" value="">Everything</button>
+  {% if all_courses | length > 1 %}
+  <span class="filters__c" role="group" aria-label="filter by course">
+    {% for cc in all_courses %}
+    <a class="chip{% if course == cc %} is-on{% endif %}"
+       href="/tasks?state_f={{ state_f }}&course={{ '' if course == cc else cc }}"
+       {% if course == cc %}aria-current="true"{% endif %}>{{ cc }}</a>
+    {% endfor %}
+  </span>
+  {% endif %}
+</form>
+
+{% if not cards %}
+{{ empty("Nothing matches this filter.",
+         "That is a fact about your sources, not a loading state: ALIBI does not keep a secret list of work.
+          Clear the filter, or add the document that states it.", "Show everything", "/tasks") }}
+{% else %}
+<section class="sec" aria-labelledby="list-h">
+  <h2 id="list-h">
+    {%- if state_f == 'past' %}Past its date — ALIBI will not guess whether you submitted
+    {%- elif state_f == 'done' %}Marked done
+    {%- elif state_f == 'open' %}Open
+    {%- else %}Your list{% endif %}
+    <span class="mini faint">{{ cards | length }} shown</span></h2>
+  <ol class="stack">
+    {% for c in cards %}{{ task_card(c, expanded=c.overdue) }}{% endfor %}
+  </ol>
+  {% if state_f == 'past' %}
+  <p class="mini">A date passing is not evidence of a miss: no source says what happened after it. Mark it
+    handed in from the card, and the claim carries your words and the moment you wrote them.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if plan %}
+<section class="sec">{{ plan_words(plan) }}</section>
+{% endif %}
+{% endblock %}

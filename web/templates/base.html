@@ -1,118 +1,304 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if calm %} data-calm{% endif %}>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070d">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="ALIBI — an academic twin that grounds every fact in a verbatim source span,
+refuses what it cannot prove, and puts an obligation, its receipt, and its consequence on the same screen.">
 <title>{% block title %}Alibi{% endblock %} — academic twin</title>
 {# Layer 1: everything needed to render *correctly* is inline below, because the demo may run on a college
-   network where any external asset — this one is local, but the failure mode is the same — is a coin flip.
-   Layer 2 (alibi.css, alibi.js) adds depth, motion, toasts and a palette; both are served from /static in
-   this very process, never a CDN, and if they fail to load the page is identical apart from the effects. #}
-{% if has_static %}<link rel="stylesheet" href="/static/alibi.css?v={{ built_at }}">{% endif %}
+   network where any external asset — these four are local, but the failure mode is the same — is a coin
+   flip. Layers 2 and 3 (alibi.css, motion.js, atmosphere.js, scene.js) add the environment: fluid surfaces,
+   inertia scroll, a WebGL atmosphere, a cursor, a field of facts. Every one of them is optional. If all four
+   404 the page is identical apart from the effects: same numbers, same forms, same receipts, still readable.
+   That is not modesty, it is a requirement of a trust dashboard — a page whose *content* depends on a script
+   shows nothing exactly when something has gone wrong. #}
 <style>
 :root{
-  --bg:#080b10; --panel:#0e141c; --panel2:#121a24; --line:#1e2937; --ink:#dbe6f2; --dim:#7d8ea3;
-  --hi:#7ee787; --warn:#ffb454; --bad:#ff6b6b; --info:#6bb8ff; --vio:#c39cff; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* Layer 1 carries the same tokens the fluid system uses, with opaque values, so that a page without
+     alibi.css is still a coherent, high-contrast, non-terminal page. The file overrides them. */
+  --bg:#080c16; --void:#05070d; --panel:#0e1524; --panel2:#121a2b; --line:#22304a; --ink:#e8eefb; --dim:#9fb0c9;
+  --hi:#6ee7a8; --warn:#ffc46b; --bad:#ff7b8a; --info:#86b8ff; --vio:#bfa6ff;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --display:"Avenir Next","Futura","Trebuchet MS","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --r:18px; --r-sm:12px; --e:cubic-bezier(.16,.84,.24,1); --fast:140ms;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 var(--mono)}
-a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
-.shell{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
-nav{border-right:1px solid var(--line);background:linear-gradient(180deg,#0a0e14,#0b1016);padding:14px 0;position:sticky;top:0;height:100vh;overflow:auto}
-.brand{padding:0 14px 12px;border-bottom:1px solid var(--line)}
-.brand b{display:block;font-size:15px;letter-spacing:.14em;color:#fff}
-.brand span{font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
-nav a{display:flex;justify-content:space-between;gap:8px;padding:6px 14px;color:var(--dim);font-size:12px;border-left:2px solid transparent}
-nav a:hover{background:#0f151d;color:var(--ink);text-decoration:none}
-nav a.on{color:#fff;background:#111a24;border-left-color:var(--hi)}
-nav a i{font-style:normal;color:var(--warn)}
-main{padding:16px 20px 60px;min-width:0}
-h1{font-size:17px;margin:0 0 2px;letter-spacing:.02em}
-h2{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin:22px 0 8px}
-.sub{color:var(--dim);font-size:12px;margin:0 0 14px;max-width:78ch}
-.grid{display:grid;gap:10px}
-.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
-.g2{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
-.panel h3{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 12px}
-.stat b{display:block;font-size:26px;line-height:1.05;font-weight:600}
-.stat u{display:block;text-decoration:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:5px}
-.stat small{color:var(--dim);font-size:11px}
-.ok b{color:var(--hi)} .warn b{color:var(--warn)} .bad b{color:var(--bad)} .info b{color:var(--info)}
-.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;letter-spacing:.06em;
-  border:1px solid var(--line);background:#0c1218;color:var(--dim);white-space:nowrap}
-.p-hi{color:var(--hi);border-color:#1c3b28;background:#0d1a12}
-.p-warn{color:var(--warn);border-color:#3c2e14;background:#1a1409}
-.p-bad{color:var(--bad);border-color:#3d1c1c;background:#1a0d0d}
-.p-info{color:var(--info);border-color:#16304d;background:#0b1522}
-.p-vio{color:var(--vio);border-color:#2b2340;background:#120f1c}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-  border-bottom:1px solid var(--line);padding:6px 8px;position:sticky;top:0;background:var(--panel)}
-td{border-bottom:1px solid #141c26;padding:6px 8px;vertical-align:top}
-tr:hover td{background:#101822}
-.num{text-align:right;font-variant-numeric:tabular-nums}
-.quote{background:#0a1017;border-left:2px solid var(--hi);padding:6px 9px;color:#a8c5a8;
-  font-size:12px;white-space:pre-wrap;word-break:break-word;border-radius:0 5px 5px 0}
-.quote.none{border-left-color:var(--warn);color:#c9b48a}
-pre{margin:0;background:#0a1017;border:1px solid var(--line);border-radius:6px;padding:9px;
-  overflow:auto;font-size:11.5px;white-space:pre-wrap;word-break:break-word}
-form.inline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
-input,select,textarea,button{font:inherit;color:var(--ink);background:#0b1118;border:1px solid var(--line);
-  border-radius:6px;padding:5px 8px}
-input:focus,select:focus,textarea:focus{outline:1px solid var(--info)}
-button,input[type=submit]{cursor:pointer;background:#16212e;border-color:#25384d;color:#fff}
-button:hover{background:#1c2a3a}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.62 var(--sans)}
+a{color:var(--info);text-decoration:none} a:hover{text-decoration:none}
+.shell{display:block;min-height:100vh}
+main{padding:26px clamp(18px,4vw,64px) 90px;min-width:0}
+nav{display:flex;flex-wrap:wrap;gap:6px;padding:10px clamp(14px,3vw,28px);background:var(--void);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:12;backdrop-filter:blur(8px)}
+nav a{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:99px;font-size:13px;color:var(--dim)}
+nav a:hover{color:var(--ink);background:#121a2b}
+nav a.on{color:#fff;background:#16223a;box-shadow:inset 0 0 0 1px var(--line)}
+nav a i{font-style:normal;font-size:10px;color:var(--warn);font-family:var(--mono)}
+h1{font-family:var(--display);font-size:clamp(1.9rem,4vw,3.1rem);font-weight:600;letter-spacing:-.025em;
+   line-height:1;margin:0 0 10px;text-wrap:balance}
+h2{font-family:var(--display);font-size:1.3rem;font-weight:600;margin:32px 0 10px}
+h3{font-size:11px;letter-spacing:.17em;text-transform:uppercase;color:var(--dim);margin:0 0 8px;font-weight:600}
+.sub{color:var(--dim);font-size:15px;margin:0 0 22px;max-width:66ch;line-height:1.62}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--dim);margin:0 0 14px}
+.lead{font-family:var(--display);font-size:1.35rem;line-height:1.42;letter-spacing:-.015em;max-width:32ch}
+.aside{max-width:66ch;color:var(--dim);padding-left:18px;border-left:1px solid var(--line)}
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.compose{display:grid;gap:22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:12px}
+.obj{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.stat b{display:block;font-family:var(--display);font-size:2.1rem;line-height:1;font-weight:600;letter-spacing:-.03em}
+.stat span{display:block;margin-top:6px;font-size:12.5px}
+.stat u{display:block;text-decoration:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:3px}
+.figure{padding:14px 16px}
+.figure .n{display:block;font-family:var(--display);font-size:2.4rem;font-weight:600;line-height:1;letter-spacing:-.03em}
+.figure .k{display:block;margin-top:8px;font-size:12.5px}
+.figure .d{display:block;margin-top:3px;font-size:11.5px;color:var(--dim)}
+.ok b,.ok .n{color:var(--hi)} .warn b,.warn .n{color:var(--warn)} .bad b,.bad .n{color:var(--bad)} .info b,.info .n{color:var(--info)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  font-family:var(--mono);border:1px solid var(--line);background:#0c1218;color:var(--dim);white-space:nowrap}
+.p-hi{color:var(--hi);border-color:#25543b;background:#0d1a12}
+.p-warn{color:var(--warn);border-color:#594620;background:#1a1409}
+.p-bad{color:var(--bad);border-color:#572931;background:#1a0d10}
+.p-info{color:var(--info);border-color:#22406a;background:#0b1522}
+.p-vio{color:var(--vio);border-color:#3c3260;background:#120f1c}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
+th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line);padding:11px 14px;position:sticky;top:0;background:var(--panel)}
+td{border-bottom:1px solid #182338;padding:11px 14px;vertical-align:top}
+tr:hover td{background:#101a2b}
+.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+.quote{background:#0a1424;border-left:2px solid var(--hi);padding:10px 13px;color:#cfe4d8;border-radius:0 var(--r-sm) var(--r-sm) 0;
+  font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.quote.none{border-left-color:var(--warn);color:#e6d4ab}
+pre{margin:0;background:#0a1424;border:1px solid var(--line);border-radius:var(--r-sm);padding:13px;
+  overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;font-family:var(--mono)}
+code{background:#111b2c;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe0ff;font-size:.86em;font-family:var(--mono)}
+kbd{background:#111b2c;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:11.5px;font-family:var(--mono)}
+form.inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 18px}
+input,select,textarea,button{font-family:var(--sans);font-size:13.5px;color:var(--ink);background:#0b1118;
+  border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 11px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--info);outline-offset:1px}
+button,input[type=submit]{cursor:pointer;border-radius:99px;background:#16223a;border-color:#2b415f;color:#fff;font-size:13px;padding:8px 15px}
+button:hover,input[type=submit]:hover{background:#1d2c47}
+button:disabled{opacity:.5}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sep{height:1px;background:var(--line);margin:14px 0;border:0}
+.mini{font-size:12.5px;color:var(--dim);line-height:1.55}
+.scroll{max-height:360px;overflow:auto}
+.bar{height:6px;background:#0b1118;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#2c6b3f,var(--hi))}
+.bar.warn>i{background:linear-gradient(90deg,#7a5a1e,var(--warn))}
+.bar.bad>i{background:linear-gradient(90deg,#7a2424,var(--bad))}
+.notice{border:1px solid #2f5540;background:#0f1a15;color:#d5f0dd;padding:13px 16px;border-radius:var(--r);font-size:13.5px;line-height:1.6}
+.notice.bad{border-color:#5b2b33;background:#1a0e12;color:#ffdfe3}
+.notice.info{border-color:#22406a;background:#0c1520;color:#d7e7ff}
+.strip{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:13px 16px;border:1px solid var(--line);
+  border-radius:var(--r);background:#0a1120}
+details{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 14px;background:#0b1220;margin:8px 0}
+summary{cursor:pointer;color:var(--ink);font-size:13px}
+.badge{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:99px;border:1px solid var(--line)}
+.b-real{color:#9ff0c0;border-color:#274a2f;background:#101a12}
+.b-sim{color:#ffd479;border-color:#594620;background:#1a1509}
+.b-oracle{color:#c39cff;border-color:#3c3260;background:#130f1e}
+.b-none{color:#ff9aa5;border-color:#572931;background:#1a0d10}
+.b-vio{color:#c39cff;border-color:#3c3260;background:#130f1e}
 .possess{color:var(--dim)}
-.bar{height:7px;background:#0b1118;border:1px solid var(--line);border-radius:99px;overflow:hidden}
-.bar>i{display:block;height:100%;background:linear-gradient(90deg,#2c6b3f,#7ee787)}
-.bar.warn>i{background:linear-gradient(90deg,#7a5a1e,#ffb454)}
-.bar.bad>i{background:linear-gradient(90deg,#7a2424,#ff6b6b)}
-.edge{fill:none;stroke:#31465c;stroke-width:1.4;marker-end:url(#arr)}
-.elab{fill:#7d8ea3;font-size:9px;font-family:var(--mono);text-anchor:middle}
-.node rect{fill:#131d28;stroke:#2a3d52}
-.node.src rect{fill:#141f16;stroke:#2c4a31} .node.task rect{fill:#1a1626;stroke:#3a2f55}
-.node text{fill:#cfe0f2;font-size:11px;font-family:var(--mono)}
-.foot{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);color:#556575;font-size:11px}
-.foot b{color:var(--dim);font-weight:400}
-.notice{border:1px solid #2b3a20;background:#111a0f;color:#c8e6b0;padding:8px 10px;border-radius:6px;font-size:12px}
-.notice.bad{border-color:#3d2020;background:#180e0e;color:#f0bcbc}
-.notice.info{border-color:#1e3348;background:#0c1520;color:#b9d6f2}
-kbd{background:#121a24;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.sep{height:1px;background:var(--line);margin:10px 0}
-.mini{font-size:11px;color:var(--dim)}
-.scroll{max-height:340px;overflow:auto}
-code{background:#0f161f;border-radius:3px;padding:0 4px;color:#a8c5e8;font-size:11.5px}
-details{border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:#0c1218;margin:6px 0}
-summary{cursor:pointer;color:var(--ink);font-size:12px}
-.badge{font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:1px 5px;border-radius:3px;border:1px solid}
-.b-real{color:#9fe3ad;border-color:#274a2f;background:#101a12}
-.b-sim{color:#ffd479;border-color:#4a3c18;background:#1a1509}
-.b-oracle{color:#c39cff;border-color:#332a4a;background:#130f1e}
-.b-none{color:#8fa3b8;border-color:#2a3a4c;background:#0d151e}
+.edge{fill:none;stroke:#40597c}
+.elab{fill:#9fb0c9;font-size:9px;font-family:var(--mono);text-anchor:middle}
+.node rect{fill:#121d2e;stroke:#2f4666;rx:10}
+.node.src rect{fill:#101f18;stroke:#2c4a31} .node.task rect{fill:#181426;stroke:#3a2f55}
+.node text{fill:#dfe9fb;font-size:11px;font-family:var(--mono)}
+.foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}
+.foot b{color:var(--ink);font-weight:500}
+/* ── the calm shell, layer 1 ────────────────────────────────────────────────────────────────────────
+   Same rule as the fluid layer, opposite direction: the six human pages must be legible and correctly
+   spaced before any stylesheet arrives, so their geometry lives here too. `calm.css` then adds the parts
+   worth caching (task cards, calendar grid, review sheets) and the responsive behaviour. ── */
+html[data-calm]{font-size:16px}
+html[data-calm] body{background:#f7f8fa;color:#151a21;font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+html[data-calm] .skip{position:absolute;left:-9999px}
+html[data-calm] .skip:focus{left:12px;top:12px;z-index:60;background:#fff;padding:8px 12px;border-radius:8px;
+  box-shadow:0 0 0 3px #2f6feb33;color:#1b4fbf}
+html[data-calm] .shell[data-shell=calm]{display:block;min-height:100vh}
+html[data-calm] .side{display:none}
+html[data-calm] .col{display:block;padding:0 18px 88px;max-width:74ch;margin:0 auto}
+html[data-calm] .top{display:flex;justify-content:flex-end;padding:14px 0 0}
+html[data-calm] h1{font-size:clamp(1.6rem,4.4vw,2.15rem);line-height:1.14;letter-spacing:-.018em;margin:0 0 8px;
+  font-weight:620;color:#0f141a}
+html[data-calm] h2{font-size:1.02rem;font-weight:600;letter-spacing:-.006em;margin:30px 0 10px;color:#0f141a}
+html[data-calm] h3{font-size:.95rem;font-weight:600;letter-spacing:0;text-transform:none;color:#151a21;margin:0}
+html[data-calm] p{margin:0 0 10px}
+html[data-calm] .lede{color:#4e5b6b;font-size:1rem;max-width:62ch;margin:0 0 22px}
+html[data-calm] .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78em;letter-spacing:.01em}
+html[data-calm] .faint{color:#75839a}
+html[data-calm] .tag{display:inline-block;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;
+  padding:2px 8px;border-radius:6px;background:#eceff4;color:#4e5b6b}
+html[data-calm] .act{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;font-weight:550;color:#1b4fbf;
+  text-decoration:none;border-bottom:1px solid #1b4fbf33;padding-bottom:1px}
+html[data-calm] .act:hover{border-bottom-color:#1b4fbf}
+html[data-calm] .btn{font:inherit;font-size:.9rem;font-weight:550;padding:8px 14px;border-radius:10px;border:1px solid #d8dfe9;
+  background:#fff;color:#151a21;cursor:pointer}
+html[data-calm] .btn:hover{background:#f2f5fa;border-color:#c3ccda}
+html[data-calm] .btn--quiet{background:#fff;border-style:dashed;color:#4e5b6b}
+html[data-calm] .hint{font-size:.78rem;color:#75839a;line-height:1.5;margin:7px 0 0}
+html[data-calm] .field input,html[data-calm] .ask input[type=text]{font:inherit;padding:9px 12px;border-radius:10px;
+  border:1px solid #d8dfe9;background:#fff;color:#151a21;min-width:0;width:100%}
+html[data-calm] :focus-visible{outline:2px solid #1b4fbf;outline-offset:2px;border-radius:6px}
+html[data-calm] .ask__btn{list-style:none;cursor:pointer;font-size:.9rem;font-weight:550;padding:8px 14px;border-radius:99px;
+  border:1px solid #d8dfe9;background:#fff;color:#151a21;display:inline-block}
+html[data-calm] .ask__btn::-webkit-details-marker{display:none}
+html[data-calm] .ask[open] .ask__panel{margin-top:10px;padding:14px;border:1px solid #e3e8f0;border-radius:14px;background:#fff;
+  box-shadow:0 10px 30px -18px #151a2140}
+html[data-calm] .ask__form{display:flex;gap:8px;flex-wrap:wrap}
+html[data-calm] .ask__hints{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+html[data-calm] .chip{font:inherit;font-size:.8rem;padding:5px 10px;border-radius:99px;border:1px solid #e3e8f0;background:#fafbfd;
+  color:#4e5b6b;cursor:pointer}
+html[data-calm] .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+html[data-calm] .foot{margin-top:52px;padding-top:16px;border-top:1px solid #e8ecf2;color:#75839a;font-size:.8rem}
+html[data-calm] .foot a{color:#4e5b6b}
+html[data-calm] .empty{padding:18px;border:1px dashed #dbe2ec;border-radius:14px;background:#fbfcfe;color:#4e5b6b;margin:12px 0}
+html[data-calm] .empty__title{font-size:.98rem;margin:0 0 6px;color:#151a21}
+html[data-calm] .empty__body{font-size:.9rem;margin:0;color:#5b6878}
+@media (prefers-color-scheme:dark){
+  html[data-calm] body{background:#0f1319;color:#e6ebf3}
+  html[data-calm] h1,html[data-calm] h2,html[data-calm] .empty__title{color:#f2f5fa}
+  html[data-calm] .btn,html[data-calm] .ask__btn{background:#171d26;border-color:#28313f;color:#e6ebf3}
+  html[data-calm] .btn:hover,html[data-calm] .ask__btn:hover{background:#1d2531}
+  html[data-calm] .ask[open] .ask__panel{background:#141a22;border-color:#242e3c;box-shadow:none}
+  html[data-calm] .chip{background:#141a22;border-color:#242e3c;color:#a9b6c8}
+  html[data-calm] .empty{background:#121821;border-color:#242e3c;color:#a9b6c8}
+  html[data-calm] .tag{background:#1a222e;color:#a9b6c8}
+  html[data-calm] .lede,html[data-calm] .hint{color:#a9b6c8}
+  html[data-calm] .field input,html[data-calm] .ask input[type=text]{background:#121821;border-color:#28313f;color:#e6ebf3}
+  html[data-calm] .act{color:#8fb6ff;border-bottom-color:#8fb6ff44}
+  html[data-calm] .foot{border-top-color:#212a36}
+}
+@media (min-width:940px){
+  html[data-calm] .shell[data-shell=calm]{display:grid;grid-template-columns:250px minmax(0,1fr);align-items:start}
+  html[data-calm] .side{display:flex;flex-direction:column;gap:26px;position:sticky;top:0;min-height:100vh;
+    padding:26px 22px;border-right:1px solid #e8ecf2;background:#fbfcfe}
+  html[data-calm] .col{padding:26px 40px 90px;max-width:78ch;margin:0}
+  html[data-calm] .top{padding:26px 0 0}
+}
+@media (prefers-reduced-motion: reduce){html[data-calm] *{transition:none!important;animation:none!important}}
+/* the SVG lineage graph: the same light language as the rest of the page */
+.graph-frame{border:1px solid var(--line);border-radius:var(--r);padding:8px;background:#080e1a;overflow:auto}
+@media (max-width:900px){ nav{position:static} main{padding:18px 16px 80px} .g2,.g3,.g4{grid-template-columns:1fr}
+  table{display:block;overflow-x:auto} h1{font-size:1.9rem} }
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
 </style>
+{% if has_static %}
+{# Two layers, deliberately: `alibi.css` is the fluid/cinematic system the technical surfaces use; `calm.css`
+   is the renovation's own system (space, type, one accent, no glass, no scroll effects), and a page loads one
+   or the other, never both — a design system that has to win a cascade fight against another design system is
+   not a design system.
+   The order is load-bearing, not cosmetic: layer 1 is the inline fallback that must render with no file at
+   all, so it is emitted FIRST and the cached file after it. It used to be the other way round, which silently
+   made every responsive rule in calm.css inert (the tablet bottom-nav bug), while the comment up in <head>
+   cheerfully claimed "the file overrides them". A claim in a comment is worth nothing next to a rule order. #}
+{% if calm %}<link rel="stylesheet" href="/static/calm.css?v={{ built_at }}">{% else %}
+<link rel="stylesheet" href="/static/alibi.css?v={{ built_at }}">{% endif %}
+{% endif %}
 {% block head %}{% endblock %}
 </head>
 <body>
-<div class="shell">
-<nav>
-  <div class="brand"><b>ALIBI</b><span>proof before promotion</span></div>
-  {% for key,label,href in nav %}<a class="{{ 'on' if key==active }}" href="{{ href }}">{{ label }}
-    {% if key=='queue' and c_reviews_open %}<i>{{ c_reviews_open }}</i>{% endif %}
-    {% if key=='conflicts' and c_conflicts %}<i>{{ c_conflicts }}</i>{% endif %}
-    {% if key=='actions' and c_actions %}<i>{{ c_actions }}</i>{% endif %}
-  </a>{% endfor %}
-  <div style="padding:12px 14px;border-top:1px solid var(--line);margin-top:10px">
-    <form method="post" action="/api/sync"><input type="hidden" name="demo" value="true">
-      <button style="width:100%">⟳ sync now</button></form>
-    <div class="mini" style="margin-top:8px">mode <b>{{ c_mode or '—' }}</b><br>
-      local <b>{{ c_local or 'none' }}</b><br>cloud <b>{{ c_cloud or 'off' }}</b></div>
+{% if not calm %}
+{# ── the environment: three planes behind the content, all of them removable ─────────────────── #}
+{# The calm pages do not even *create* these nodes. A `display:none` would still leave a canvas for the
+   compositor to allocate and a screen reader to walk past, and it would let a CSS bug bring the glow back
+   onto the page a student reads at 1 a.m. Absent is a stronger promise than hidden. #}
+<canvas id="atmosphere" aria-hidden="true" role="presentation"></canvas>
+<div class="fluid-orbs" aria-hidden="true">
+  <span class="fluid-orb fluid-orb--a" data-depth="1.5"></span>
+  <span class="fluid-orb fluid-orb--b" data-depth="2.6"></span>
+  <span class="fluid-orb fluid-orb--c" data-depth="4.1"></span>
+</div>
+<div class="fluid-cursor" aria-hidden="true"></div>
+{% endif %}
+
+{% if calm %}
+<div class="shell" data-shell="calm">
+<a class="skip" href="#main">Skip to content</a>
+<aside class="side">
+  <div class="side__brand">
+    <span class="wordmark">ALIBI</span>
+    <span class="side__tag">your academic twin, with receipts</span>
   </div>
+  <nav class="side__nav" aria-label="ALIBI">
+    {% for key,label,href in nav %}
+    <a class="navi{% if key==nav_key %} is-on{% endif %}" href="{{ href }}"{% if key==nav_key %} aria-current="page"{% endif %}>
+      <span class="navi__l">{{ label }}</span>
+      {% if key == 'review' and c_reviews_open %}
+      {# the count is a *label*, not a number a screen reader has to interpret out of context #}
+      <span class="navi__n" aria-label="{{ c_reviews_open }} waiting for you">{{ c_reviews_open }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+  <div class="side__foot">
+    <form method="post" action="/api/sync" class="syncbox">
+      <input type="hidden" name="demo" value="true">
+      <button class="btn btn--quiet" type="submit">Read my sources again</button>
+      <p class="hint">Re-reads every document already on file, re-verifies every quote, and writes nothing
+        that does not match a source. Takes about a second.</p>
+    </form>
+    <p class="side__model mono">model {{ c_mode }} · local {{ c_local }} · cloud {{ c_cloud }}</p>
+    <p class="side__links"><a href="/technical">Advanced</a> · <a href="/api/export/twin.ics">calendar file</a></p>
+  </div>
+</aside>
+<div class="col">
+<header class="top">
+  <details class="ask" id="ask">
+    <summary class="ask__btn">Ask ALIBI</summary>
+    <div class="ask__panel">
+      <form method="get" action="/" class="ask__form">
+        <label class="sr-only" for="ask-q">Your question</label>
+        <input id="ask-q" name="ask" type="text" autocomplete="off"
+               placeholder="What should I work on today?" {% if ask_q %}value="{{ ask_q }}"{% endif %}>
+        <button class="btn" type="submit">Ask</button>
+      </form>
+      <p class="ask__hints">
+        {% for s in ask_suggestions %}<button class="chip" type="submit" form="" data-ask="{{ s }}">{{ s }}</button>{% endfor %}
+      </p>
+    </div>
+  </details>
+</header>
+{% else %}
+<div class="shell">
+<nav aria-label="ALIBI sections">
+  <div class="brand" style="display:flex;align-items:baseline;gap:10px;padding-right:14px">
+    <b style="font-family:var(--display);font-size:15px;letter-spacing:.26em;color:#fff">ALIBI</b>
+    <span style="font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">proof before promotion</span>
+  </div>
+  {% for key,label,href in nav %}<a class="{{ 'on' if key==active }}"{% if key==nav_key %} aria-current="page"{% endif %} href="{{ href }}">{{ label }}
+    {% if key=='queue' and c_reviews_open %}<i aria-label="open review items">{{ c_reviews_open }}</i>{% endif %}
+    {% if key=='conflicts' and c_conflicts %}<i aria-label="open conflicts">{{ c_conflicts }}</i>{% endif %}
+    {% if key=='actions' and c_actions %}<i aria-label="actions awaiting a decision">{{ c_actions }}</i>{% endif %}
+  </a>{% endfor %}
+  <form method="post" action="/api/sync" style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <input type="hidden" name="demo" value="true">
+    <button style="min-height:34px">Sync the corpus</button>
+  </form>
+  <span class="mini" style="font-family:var(--mono);font-size:10.5px">mode <b>{{ c_mode or '—' }}</b> ·
+    local <b>{{ c_local or 'none' }}</b> · cloud <b>{{ c_cloud or 'off' }}</b></span>
 </nav>
-<main>
+{% endif %}
+{% if calm %}<main id="main">{% else %}<main id="page-{{ page_slug }}">{% endif %}
+{# A page that composes its own scene re-declares this whole block. The `not no_hero` test therefore only
+   ever runs for pages that did *not*: adding a hero to a template is the one and only edit that template
+   needs, rather than also a change to its route. #}
+{% block hero scoped %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">{{ page_eyebrow or 'academic twin · ' ~ (c_mode or 'rules_only') }}</p>
+  <h1 class="hero-line">{% block h1 %}{{ self.title() }}{% endblock %}</h1>
+</header>
+{% endblock %}
 {% block body %}{% endblock %}
 <div class="foot">
   <div class="row" style="justify-content:space-between">
@@ -122,13 +308,24 @@ summary{cursor:pointer;color:var(--ink);font-size:12px}
       <a href="/api/export/ledger.csv">ledger.csv</a> · <a href="/api/export/twin.ics">twin.ics</a> ·
       <a href="/metrics">metrics</a> · <a href="/api/docs">API</a></span>
   </div>
-  <div class="mini" style="margin-top:4px">Every number on every page is a COUNT or SUM over rows in
+  <div class="mini" style="margin-top:6px">Every number on every page is a COUNT or SUM over rows in
     SQLite. Numbers that came from a model are labelled; numbers that came from a deterministic
-    oracle are labelled too. Nothing here is a mock.</div>
+    oracle are labelled too. Nothing here is a mock. The light behind this text is decoration — it carries
+    no information, and the page is identical without it.</div>
 </div>
 </main>
 </div>
-{% if has_static %}<script src="/static/alibi.js?v={{ built_at }}" defer></script>{% endif %}
+{% if calm %}</div>{% endif %}
+{% if has_static %}
+{% if calm %}
+<script src="/static/calm.js?v={{ built_at }}" defer></script>
+{% else %}
+<script src="/static/motion.js?v={{ built_at }}" defer></script>
+<script src="/static/atmosphere.js?v={{ built_at }}" defer></script>
+<script src="/static/scene.js?v={{ built_at }}" defer></script>
+<script src="/static/alibi.js?v={{ built_at }}" defer></script>
+{% endif %}
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

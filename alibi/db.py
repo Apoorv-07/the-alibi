@@ -529,10 +529,17 @@ class DB:
         # view filtered on — so the item vanished from the open queue *and* never appeared under
         # "recently answered": an answer that disappears from history is the failure mode of a to-do app,
         # not of a ledger.
+        # and `status` has exactly four legal values, which is not decoration: an invented decision word (a
+        # "defer", a "snooze", a `keep_own` spelled differently) used to be written straight through and raise
+        # `CHECK constraint failed` — a 500 on the one screen whose entire job is to accept an answer. So the
+        # mapping is explicit and total: acting on it is `answered`, skipping it is `dismissed`, postponing it
+        # is `expired`, and no string from a form ever becomes a status as-written.
+        status = ("answered" if decision in ("approve", "manual", "accept", "confirm", "keep_own") else
+                  "dismissed" if decision in ("dismiss", "reject", "skip") else
+                  "expired" if decision in ("defer", "later", "snooze") else "answered")
         self.x("""UPDATE review_item SET status=?, resolution=?, resolved_at=?, resolved_by=?,
                  consequence=? WHERE id=?""",
-               ("answered" if decision in ("approve", "manual", "accept", "confirm") else
-                "dismissed" if decision in ("dismiss", "reject") else decision,
+               (status,
                 json.dumps(chosen, ensure_ascii=False) if chosen is not None else decision,
                 now(), decided_by, consequence, review_id))
         self.record_change(kind="REVIEW_RESOLVED", subject_type=row["subject_type"],
@@ -1005,7 +1012,9 @@ class DB:
                 "edges": [{"from": e["from_claim"], "to": e["to_claim"], "kind": e["edge"],
                            "why": e.get("why", "")} for e in edges],
                 "nodes": nodes, "claim_ids": [c["id"] for c in claims],
-                "graph_url": f"/api/lineage/{subject_type}/{subject_id}",
+                # /api/graph is the real route; this used to name /api/lineage/<type>/<id>, which never
+                # existed, so the twin page's "raw graph view" link was a 404 sitting under a working picture.
+                "graph_url": f"/api/graph?type={subject_type}&task={subject_id}",
                 "changes": self.changes(limit=25, subject_id=subject_id)}
 
 

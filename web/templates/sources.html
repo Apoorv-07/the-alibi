@@ -1,20 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Sources{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">{{ rows | length }} artifact(s) · {{ obs | length }} observation(s)</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">The bytes<br>we were <em>handed</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Content-addressed artifacts, what the system did with each, and what it could not read. Re-syncing the same bytes creates no new rows — that is why a crash mid-demo is a retry, not a corrupted ledger.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">Nothing is uploaded anywhere.</p>
+      <p class="mini" style="margin-top:10px">This form posts to your own container. PDFs and images go through the OCR path when available and fall back to a review item when it is not — a page we cannot read never becomes a claim.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Sources</h1>
-<p class="sub">Content-addressed artifacts, what the system did with each, and what it could not read.
-  Re-syncing the same bytes creates no new rows — that is why a crash mid-demo is a retry, not a
-  corrupted ledger.</p>
+
 <div class="row" style="margin-bottom:10px">
   <form method="post" action="/api/ingest" enctype="multipart/form-data" class="panel" style="flex:1">
     <b class="mini">ingest a real artifact</b>
     <div class="row" style="margin-top:6px">
-      <input type="file" name="file" required>
-      <select name="kind">
+      <input type="file" name="file" required aria-label="the artifact to ingest">
+      <select name="kind" aria-label="what kind of artifact this is">
         {% for k in ('auto','syllabus_text','notice_photo','whatsapp','erp_table','ics','email','assignment_sheet','manual_entry') %}
         <option>{{ k }}</option>{% endfor %}
       </select>
-      <input name="label" placeholder="label (used as the course hint)" size="22">
+      <input name="label" placeholder="label (used as the course hint)" size="22"
+             aria-label="a label for this artifact">
       <button>ingest</button>
     </div>
     <p class="mini" style="margin:6px 0 0">PDFs and images go through the OCR path when available and
@@ -29,7 +43,7 @@
   </form>
 </div>
 
-<table>
+<div class="ledger-wrap"><table>
 <thead><tr><th>#</th><th>label</th><th>adapter kind</th><th>stored as</th><th class="num">chars</th>
   <th class="num">claims</th><th>prior trust</th><th>status</th><th>captured</th><th>raw text</th></tr></thead>
 <tbody>
@@ -49,7 +63,7 @@
     {% else %}on disk{% endif %}</td>
 </tr>
 {% else %}<tr><td colspan="10" class="mini">No sources ingested.</td></tr>{% endfor %}
-</tbody></table>
+</tbody></table></div>
 
 <h2>Observations (what was actually looked at)</h2>
 <p class="mini">An observation is one read of one artifact region: a chat line, a PDF table row, an OCR

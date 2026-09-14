@@ -1,0 +1,361 @@
+/* calm.css — the design system of the six human pages.
+ *
+ * Written as a *counterweight* to `alibi.css` (the fluid layer, kept for the technical surfaces). Both files
+ * share the palette idea, but this one takes the opposite stance: one accent, no glass, no blur, no
+ * scroll-linked motion, no glow, and a measure long enough to read a sentence in. The rule this file exists to
+ * enforce is on line 1 of the brief: sophistication belongs in the intelligence, simplicity belongs here.
+ *
+ * Nothing in this file hides content. If it fails to load, the inline layer in base.html already positions
+ * and colours everything; these rules add the density that makes it comfortable.
+ */
+
+:root {
+  /* ── tokens ─────────────────────────────────────────────────────────────────────────────────────── */
+  --c-bg: #f7f8fa;
+  --c-surface: #ffffff;
+  --c-surface-2: #fbfcfe;
+  --c-line: #e6eaf1;
+  --c-line-strong: #d4dbe6;
+  --c-ink: #12171e;
+  --c-ink-2: #4c5866;
+  --c-ink-3: #75839a;
+  --c-accent: #1b4fbf;
+  --c-accent-soft: #eaf0fd;
+  --c-ok: #1f6b45;
+  --c-warn: #8a5a10;
+  --c-bad: #96303f;
+  --c-radius: 14px;
+  --c-radius-sm: 10px;
+  --c-gap: 18px;
+  --c-ease: cubic-bezier(.22, .7, .28, 1);
+  --c-fast: 120ms;
+  --c-mid: 200ms;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #0f1319; --c-surface: #151b23; --c-surface-2: #121821;
+    --c-line: #232d3a; --c-line-strong: #2e3a4b;
+    --c-ink: #e7ecf4; --c-ink-2: #aab7c8; --c-ink-3: #8a99ad;
+    --c-accent: #8fb6ff; --c-accent-soft: #1a2740;
+    --c-ok: #74d6a3; --c-warn: #f0c274; --c-bad: #ff9aa7;
+  }
+}
+
+html[data-calm] body { background: var(--c-bg); color: var(--c-ink); }
+html[data-calm] { scrollbar-gutter: stable; }
+html[data-calm] a { color: var(--c-accent); }
+html[data-calm] .main, html[data-calm] main { display: block; }
+
+/* ── shell ──────────────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .side { background: var(--c-surface-2); border-right: 1px solid var(--c-line); gap: 30px; }
+html[data-calm] .side__brand { display: flex; flex-direction: column; gap: 5px; }
+html[data-calm] .wordmark { font: 600 15px/1 var(--sans); letter-spacing: .2em; color: var(--c-ink); }
+html[data-calm] .side__tag { font-size: .76rem; color: var(--c-ink-3); letter-spacing: .01em; }
+html[data-calm] .side__nav { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0;
+  background: none; position: static; backdrop-filter: none; }
+html[data-calm] .navi { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 11px; border-radius: 10px; color: var(--c-ink-2); font-size: .95rem; text-decoration: none;
+  transition: background var(--c-fast) linear, color var(--c-fast) linear; }
+html[data-calm] .navi:hover { background: #0000000a; color: var(--c-ink); text-decoration: none; }
+html[data-calm] .navi.is-on { background: var(--c-surface); color: var(--c-ink); font-weight: 560;
+  box-shadow: inset 2px 0 0 var(--c-accent), 0 0 0 1px var(--c-line); }
+html[data-calm] .navi__n { font: 500 .74rem/1 var(--mono); color: var(--c-bad); background: #96303f14;
+  padding: 3px 7px; border-radius: 99px; }
+html[data-calm] .side__foot { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+html[data-calm] .side__model, html[data-calm] .side__links { font-size: .74rem; color: var(--c-ink-3); margin: 0; }
+html[data-calm] .syncbox { display: flex; flex-direction: column; gap: 0; }
+html[data-calm] .top { gap: 12px; }
+
+/* ── page openings: one heading, one sentence, then content ─────────────────────────────────────────── */
+html[data-calm] .head { padding: 8px 0 4px; margin: 0 0 26px; }
+html[data-calm] .kicker { font: 500 .78rem/1.4 var(--mono); letter-spacing: .04em; color: var(--c-ink-3);
+  margin: 0 0 10px; text-transform: none; }
+html[data-calm] .head h1 { max-width: 26ch; }
+html[data-calm] .sec { margin: 0 0 34px; }
+html[data-calm] .sec > h2 { display: flex; align-items: baseline; gap: 10px; }
+html[data-calm] .sec--quiet { padding: 18px 0 0; border-top: 1px solid var(--c-line); }
+html[data-calm] .sec--warn > h2 { color: var(--c-bad); }
+html[data-calm] .mini { font-size: .84rem; color: var(--c-ink-2); line-height: 1.55; }
+html[data-calm] .faint { color: var(--c-ink-3); }
+html[data-calm] .mono { color: var(--c-ink-3); }
+
+/* ── attention: the one place with weight ───────────────────────────────────────────────────────────── */
+html[data-calm] .att-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+html[data-calm] .att { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 14px 16px; background: var(--c-surface); border: 1px solid var(--c-line);
+  border-radius: var(--c-radius); transition: border-color var(--c-fast) linear; }
+html[data-calm] .att:hover { border-color: var(--c-line-strong); }
+html[data-calm] .att--now { border-left: 3px solid var(--c-bad); }
+html[data-calm] .att__body { min-width: 0; }
+html[data-calm] .att__line { margin: 0 0 3px; font-size: .98rem; line-height: 1.45; color: var(--c-ink); }
+html[data-calm] .att__why { margin: 0; font-size: .84rem; color: var(--c-ink-2); }
+html[data-calm] .att__meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; align-items: center; }
+html[data-calm] .att .act { white-space: nowrap; }
+
+/* ── task cards: a stack, not a grid of boxes ───────────────────────────────────────────────────────── */
+html[data-calm] .stack { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+html[data-calm] .task { padding: 15px 17px 14px; background: var(--c-surface); border: 1px solid var(--c-line);
+  border-radius: var(--c-radius); }
+html[data-calm] .task:hover { border-color: var(--c-line-strong); }
+html[data-calm] .task--past { border-left: 3px solid var(--c-warn); }
+html[data-calm] .task--ambiguous { border-left: 3px solid var(--c-bad); }
+html[data-calm] .task__head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+html[data-calm] .task__course { margin: 0 0 2px; font: 500 .74rem/1 var(--mono); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c-ink-3); }
+html[data-calm] .task__title { margin: 0; font-size: 1.04rem; font-weight: 570; letter-spacing: -.006em; }
+html[data-calm] .task__when { margin: 0; font-size: .88rem; color: var(--c-ink-2); white-space: nowrap; }
+html[data-calm] .facts { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 11px 0 0;
+  padding: 0; font-size: .84rem; color: var(--c-ink-2); }
+html[data-calm] .facts li { display: inline-flex; align-items: center; gap: 5px; }
+html[data-calm] .facts li + li::before { content: "·"; color: var(--c-ink-3); margin-right: 4px; }
+html[data-calm] .facts u { text-decoration: none; font: 500 .68rem/1 var(--mono); color: var(--c-warn);
+  background: #8a5a101a; padding: 2px 5px; border-radius: 5px; }
+html[data-calm] .task__flag { margin: 10px 0 0; font-size: .86rem; color: var(--c-bad); }
+html[data-calm] .deep { margin: 12px 0 0; padding: 0; border: 0; background: none; }
+html[data-calm] .deep > summary { cursor: pointer; font-size: .85rem; color: var(--c-accent); list-style: none;
+  padding: 2px 0; }
+html[data-calm] .deep > summary::-webkit-details-marker { display: none; }
+html[data-calm] .deep > summary::before { content: "＋ "; font-family: var(--mono); }
+html[data-calm] .deep[open] > summary::before { content: "− "; }
+html[data-calm] .deep .kv { margin: 10px 0 0; padding: 12px 14px; background: var(--c-surface-2);
+  border: 1px solid var(--c-line); border-radius: var(--c-radius-sm); }
+html[data-calm] .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font-size: .85rem; }
+html[data-calm] .kv dt { color: var(--c-ink-3); }
+html[data-calm] .kv dd { margin: 0; color: var(--c-ink); overflow-wrap: anywhere; }
+html[data-calm] .deep__link { margin: 10px 0 0; font-size: .85rem; }
+
+/* ── plan (solver, in words) ────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .plan { padding: 16px 18px; border: 1px solid var(--c-line); border-radius: var(--c-radius);
+  background: var(--c-surface-2); }
+html[data-calm] .plan--no { border-left: 3px solid var(--c-warn); }
+html[data-calm] .plan--yes { border-left: 3px solid var(--c-ok); }
+html[data-calm] .plan__h { margin: 0 0 6px; font-size: 1.02rem; }
+html[data-calm] .plan__body { margin: 0; font-size: .92rem; color: var(--c-ink-2); }
+html[data-calm] .plan__fixes-h { margin: 14px 0 6px; font-size: .86rem; color: var(--c-ink); font-weight: 560; }
+html[data-calm] .fixes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+html[data-calm] .fixes li { display: grid; gap: 2px; padding: 10px 12px; background: var(--c-surface);
+  border: 1px solid var(--c-line); border-radius: var(--c-radius-sm); }
+html[data-calm] .fixes__label { font-size: .92rem; }
+html[data-calm] .fixes__note { font-size: .8rem; color: var(--c-ink-3); }
+html[data-calm] .fixes__note.is-ok { color: var(--c-ok); }
+html[data-calm] .fixes__cost { font-size: .8rem; color: var(--c-warn); }
+html[data-calm] .plan__src { margin: 12px 0 0; font-size: .82rem; color: var(--c-ink-3); }
+
+/* ── review sheet ───────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .revs { display: grid; gap: 14px; }
+html[data-calm] .rev { padding: 18px; background: var(--c-surface); border: 1px solid var(--c-line);
+  border-radius: var(--c-radius); }
+html[data-calm] .rev__kind { margin: 0 0 6px; font: 500 .76rem/1 var(--mono); letter-spacing: .05em;
+  text-transform: uppercase; color: var(--c-ink-3); }
+html[data-calm] .rev__q { margin: 0 0 6px; font-size: 1.1rem; }
+html[data-calm] .rev__body { margin: 0; font-size: .95rem; color: var(--c-ink-2); }
+html[data-calm] .rev__why { margin: 8px 0 0; font-size: .85rem; color: var(--c-ink-3); }
+html[data-calm] .rev__opts { margin: 16px 0 0; display: grid; gap: 8px; }
+html[data-calm] .opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--c-line); border-radius: var(--c-radius-sm); background: var(--c-surface-2);
+  transition: border-color var(--c-fast) linear, background var(--c-fast) linear; }
+html[data-calm] .opt:hover { border-color: var(--c-accent); background: var(--c-accent-soft); }
+html[data-calm] .opt input { margin-top: 3px; accent-color: var(--c-accent); }
+html[data-calm] .opt:has(input:checked) { border-color: var(--c-accent); background: var(--c-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--c-accent); }
+html[data-calm] .opt__label { font-size: .95rem; }
+html[data-calm] .opt__note { display: block; font-size: .8rem; color: var(--c-ink-3); margin-top: 2px; }
+html[data-calm] .rev__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+html[data-calm] .rev__count { margin: 10px 0 0; font-size: .76rem; }
+html[data-calm] .ghost { background: none; border-style: dashed; color: var(--c-ink-2); }
+html[data-calm] .quotes { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+html[data-calm] .quote { margin: 4px 0 0; padding: 9px 12px; border-left: 2px solid var(--c-ok);
+  background: var(--c-surface-2); font: 400 .84rem/1.5 var(--mono); color: var(--c-ink-2);
+  white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 var(--c-radius-sm) var(--c-radius-sm) 0; }
+html[data-calm] .quote--sm { font-size: .78rem; }
+html[data-calm] .recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .88rem; }
+html[data-calm] .recent li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+
+/* ── evidence ───────────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .evi { display: grid; gap: 16px; }
+html[data-calm] .evi__g { padding: 16px 18px; background: var(--c-surface); border: 1px solid var(--c-line);
+  border-radius: var(--c-radius); }
+html[data-calm] .evi__h h3 a { color: var(--c-ink); text-decoration: none; }
+html[data-calm] .evi__h h3 a:hover { color: var(--c-accent); }
+html[data-calm] .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .88rem; }
+html[data-calm] .tbl th { text-align: left; font: 500 .72rem/1 var(--mono); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c-ink-3); padding: 0 12px 8px 0; border-bottom: 1px solid var(--c-line); }
+html[data-calm] .tbl td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--c-line);
+  vertical-align: top; color: var(--c-ink); }
+html[data-calm] .tbl tr:last-child td { border-bottom: 0; }
+html[data-calm] .flow { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 12px; }
+html[data-calm] .flow__step { padding: 14px; border: 1px solid var(--c-line); border-radius: var(--c-radius-sm);
+  background: var(--c-surface); }
+html[data-calm] .flow__h { margin: 0 0 4px; font-size: .9rem; }
+html[data-calm] .flow__v { margin: 0; font: 400 .84rem/1.5 var(--mono); color: var(--c-ink-2);
+  overflow-wrap: anywhere; }
+html[data-calm] .flow__edge { font-size: .8rem; padding-left: 14px; }
+
+/* ── calendar ───────────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .viewbar { display: flex; gap: 6px; align-items: center; margin: 0 0 16px; }
+html[data-calm] .vb { font-size: .86rem; padding: 6px 12px; border-radius: 99px; border: 1px solid transparent;
+  color: var(--c-ink-2); text-decoration: none; }
+html[data-calm] .vb.is-on { background: var(--c-surface); border-color: var(--c-line); color: var(--c-ink);
+  font-weight: 560; }
+html[data-calm] .vb__n { margin-left: auto; font-size: .78rem; }
+html[data-calm] .grid { display: grid; gap: 10px; }
+html[data-calm] .wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+html[data-calm] .day { min-height: 78px; padding: 7px 8px; background: var(--c-surface);
+  border: 1px solid var(--c-line); border-radius: var(--c-radius-sm); }
+html[data-calm] .day.is-end { background: var(--c-surface-2); }
+html[data-calm] .day.is-out { opacity: .5; }
+html[data-calm] .day.is-today { border-color: var(--c-accent); box-shadow: inset 0 0 0 1px var(--c-accent); }
+html[data-calm] .day__n { margin: 0 0 6px; font: 500 .8rem/1 var(--mono); color: var(--c-ink-3); }
+html[data-calm] .day.is-today .day__n { color: var(--c-accent); }
+html[data-calm] .day__ev { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+html[data-calm] .ev { display: block; font-size: .78rem; line-height: 1.3; padding: 3px 6px; border-radius: 6px;
+  text-decoration: none; color: var(--c-ink); background: var(--c-accent-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-calm] .ev--released { background: #1f6b4514; }
+html[data-calm] .ev--question { background: #8a5a101f; }
+html[data-calm] .ev--bad { background: #96303f1a; color: var(--c-bad); }
+html[data-calm] .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+html[data-calm] .ag { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 14px; align-items: start;
+  padding: 12px 0; border-bottom: 1px solid var(--c-line); }
+html[data-calm] .ag__day { margin: 0; font-size: .8rem; color: var(--c-ink-3); text-align: right; }
+html[data-calm] .ag__day b { display: block; font: 600 1.35rem/1 var(--sans); color: var(--c-ink); }
+html[data-calm] .ag__day.is-today b { color: var(--c-accent); }
+html[data-calm] .ag__ev { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+html[data-calm] .ag__ev li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: .92rem; }
+html[data-calm] .cal__note { margin-top: 18px; }
+
+/* ── ask ────────────────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .answer { margin: 18px 0 0; padding: 16px 18px; border: 1px solid var(--c-line);
+  border-radius: var(--c-radius); background: var(--c-surface); }
+html[data-calm] .answer__q { margin: 0 0 6px; font-size: .84rem; color: var(--c-ink-3); }
+html[data-calm] .answer__text { margin: 0; font-size: 1.02rem; line-height: 1.5; }
+html[data-calm] .receipts { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+html[data-calm] .receipts li { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; font-size: .88rem; }
+html[data-calm] .receipts__d { color: var(--c-ink-2); }
+html[data-calm] .answer__note { margin: 12px 0 0; font-size: .76rem; }
+
+/* ── onboarding ─────────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .ob { display: grid; gap: 20px; }
+html[data-calm] .ob__form, html[data-calm] .ob__demo { padding: 20px; background: var(--c-surface);
+  border: 1px solid var(--c-line); border-radius: var(--c-radius); }
+html[data-calm] .ob__form h2, html[data-calm] .ob__demo h2 { margin-top: 0; }
+html[data-calm] .field { display: grid; gap: 5px; margin: 0; }
+html[data-calm] .field__l { font-size: .82rem; color: var(--c-ink-2); }
+html[data-calm] .steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: .92rem;
+  color: var(--c-ink-2); }
+html[data-calm] .notice { padding: 12px 16px; border: 1px solid var(--c-line); border-radius: var(--c-radius);
+  background: var(--c-accent-soft); margin: 0 0 18px; }
+
+/* ── advanced index ─────────────────────────────────────────────────────────────────────────────────── */
+html[data-calm] .advg { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; }
+html[data-calm] .advg__g h2 { margin: 0 0 8px; font-size: .82rem; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--c-ink-3); font-family: var(--mono); font-weight: 500; }
+html[data-calm] .advg ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+html[data-calm] .advg a { font-size: .95rem; }
+html[data-calm] .filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 18px; }
+html[data-calm] .filters__c { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+html[data-calm] .chip.is-on { border-color: var(--c-accent); background: var(--c-accent-soft); color: var(--c-ink); }
+html[data-calm] .back { display: inline-block; margin-bottom: 12px; }
+
+/* ── responsive: mobile is the primary shape, not a shrunk desktop ────────────────────────────────────
+   Ordered deliberately: the phone/tablet bar first, the desktop sidebar last, because base.html's inline
+   layer 1 (which must work when calm.css is blocked) already declares the 940px grid in the same cascade
+   order. A `(max-width: 939px)` gate here would put the sidebar on top and the desktop layout would win on a
+   tablet — the exact bug this rewrite is here to record: an earlier draft left a tablet (834px) with
+   `display:none` on its only navigation, i.e. a readable page you could not leave. Same-specificity rules
+   resolve by source order, so the override has to come afterwards, not "more specifically". */
+html[data-calm] .col { max-width: none; padding: 0 16px 104px; }
+html[data-calm] .top { justify-content: flex-end; padding-top: 12px; }
+html[data-calm] .wk { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+html[data-calm] .day { min-height: 54px; padding: 5px; border-radius: 8px; }
+html[data-calm] .day__ev .ev { font-size: .68rem; padding: 2px 4px; }
+html[data-calm] .att, html[data-calm] .task { flex-direction: column; align-items: stretch; }
+html[data-calm] .task__head { flex-direction: column; gap: 2px; }
+html[data-calm] .att .act { align-self: flex-start; }
+html[data-calm] .side { display: flex; }      /* never `display:none` at any width: see the note above */
+/* one action, always reachable, at the bottom edge — a nav rail in a pocket is a lie about the thumb */
+html[data-calm] .side { display: flex; position: fixed; inset: auto 0 0 0; z-index: 40; flex-direction: row;
+  gap: 0; min-height: 0; align-items: center; padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  border-right: 0; border-top: 1px solid var(--c-line); background: var(--c-surface);
+  box-shadow: 0 -14px 26px -22px #0b122066; }
+html[data-calm] .side__brand, html[data-calm] .side__foot { display: none; }
+/* `nowrap`, explicitly: six labels at 390px do not fit, and a nav that *wraps* into a second row eats the
+   bottom of the screen and pushes content under it. A horizontal scroller is the honest shape here. */
+html[data-calm] .side__nav { flex-direction: row; flex-wrap: nowrap; width: 100%; min-width: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+html[data-calm] .side__nav::-webkit-scrollbar { display: none; }
+html[data-calm] .navi { flex: 0 0 auto; padding: 8px 12px; font-size: .9rem; min-height: 44px; }
+html[data-calm] .navi.is-on { background: var(--c-accent-soft); box-shadow: inset 0 -2px 0 var(--c-accent); }
+@media (max-width: 560px) {
+  html[data-calm] .grid .wk { grid-template-columns: 1fr; }
+  html[data-calm] .day { min-height: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr);
+    align-items: start; gap: 8px; }
+  html[data-calm] .day__n { margin: 0; }
+  html[data-calm] .day__ev { grid-template-columns: 1fr; }
+}
+
+/* ── motion: 120–200 ms, only ever on state changes ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-calm] .answer, html[data-calm] .rev, html[data-calm] .task {
+    animation: rise var(--c-mid) var(--c-ease) both; }
+  html[data-calm] details[open] > .kv { animation: rise var(--c-fast) var(--c-ease) both; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-calm] * { animation: none !important; transition: none !important; }
+}
+
+/* ── print: a receipt is a document ─────────────────────────────────────────────────────────────────── */
+@media print {
+  html[data-calm] body { background: #fff; color: #000; }
+  html[data-calm] .side, html[data-calm] .top, html[data-calm] .viewbar, html[data-calm] .filters { display: none; }
+  html[data-calm] .task, html[data-calm] .rev, html[data-calm] .evi__g { break-inside: avoid; border-color: #bbb; }
+  html[data-calm] details { display: block; }
+  html[data-calm] .deep .kv { display: block; }
+}
+html[data-calm] .status{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 10px;font-size:.88rem;color:var(--c-ink-2)}
+html[data-calm] .status__dot{width:9px;height:9px;border-radius:99px;background:var(--c-ok);flex:0 0 auto}
+html[data-calm] .status__dot--degraded{background:var(--c-warn)}
+html[data-calm] .status__dot--unavailable{background:var(--c-bad)}
+html[data-calm] .status__m{font:500 .74rem/1 var(--mono);color:var(--c-ink-3);text-decoration:none;border:1px solid var(--c-line);border-radius:99px;padding:3px 8px}
+
+/* ── one transient message, same shape as the rest of the page ─────────────────────────────────────── */
+html[data-calm] .toast-layer{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;
+  display:grid;gap:8px;max-width:min(420px,calc(100vw - 32px))}
+@media (min-width:940px){html[data-calm] .toast-layer{bottom:20px}}
+/* the desktop shape, last, so it beats the bar above it at equal specificity (see the note up there) */
+@media (min-width:940px){
+  html[data-calm] .shell[data-shell=calm]{display:grid;grid-template-columns:250px minmax(0,1fr);align-items:start}
+  html[data-calm] .side{display:flex;position:sticky;inset:auto;flex-direction:column;gap:26px;min-height:100vh;
+    padding:26px 22px;border-right:1px solid var(--c-line);border-top:0;background:var(--c-surface-2);
+    box-shadow:none;z-index:auto}
+  html[data-calm] .side__brand{display:flex}
+  html[data-calm] .side__foot{display:flex}
+  html[data-calm] .side__nav{flex-direction:column;width:auto;overflow:visible}
+  html[data-calm] .navi{flex:0 0 auto;padding:9px 11px;min-height:0;font-size:.95rem}
+  html[data-calm] .navi.is-on{box-shadow:inset 2px 0 0 var(--c-accent),0 0 0 1px var(--c-line)}
+  html[data-calm] .col{max-width:78ch;padding:26px 40px 90px}
+  html[data-calm] .top{padding-top:26px}
+}
+html[data-calm] .toast{display:grid;gap:3px;padding:12px 14px;background:var(--c-surface);border:1px solid var(--c-line);
+  border-left:3px solid var(--c-ok);border-radius:var(--c-radius-sm);box-shadow:0 12px 28px -20px #0b122066;
+  animation:rise var(--c-mid) var(--c-ease) both}
+html[data-calm] .toast b{font-size:.92rem;font-weight:600}
+html[data-calm] .toast span{font-size:.86rem;color:var(--c-ink-2);overflow-wrap:anywhere}
+html[data-calm] .toast--bad{border-left-color:var(--c-bad)}
+html[data-calm] .toast--warn{border-left-color:var(--c-warn)}
+html[data-calm] .toast--info{border-left-color:var(--c-accent)}
+html[data-calm] .toast__x{justify-self:start;background:none;border:0;padding:2px 0;margin-top:2px;font:inherit;
+  font-size:.78rem;color:var(--c-ink-3);text-decoration:underline;cursor:pointer}
+html[data-calm] .btn[disabled]{opacity:.6;cursor:progress}
+html[data-calm] .navi__n { flex: 0 0 auto; }
+html[data-calm] .kv__note{margin:8px 0 0;font-size:.78rem;color:var(--c-ink-3)}
+
+/* two verbs, two forms, one visual row: the secondary form holds only hidden inputs, so it must take no
+   space of its own and the buttons inside it must still line up with the primary one */
+html[data-calm] form[id^=defer-], html[data-calm] form[id^=dismiss-]{display:none}
+
+html[data-calm] .recent__note { font-size: .82rem; color: var(--c-ink-3); flex: 1 1 100%; }
+html[data-calm] .tag--soft { background: #eceff4cc; color: var(--c-ink-3); }

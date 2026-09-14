@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_ui.html" import empty, task_card %}
+{% block title %}Calendar{% endblock %}
+
+{% block hero scoped %}
+{% set cal = present.calendar() %}
+<header class="head">
+  <p class="kicker">{{ cal.weeks_label }}</p>
+  <h1>What is on, and when</h1>
+  <p class="lede">Deadlines and questions the ledger can actually date. A day with nothing on it is left empty
+    on purpose: ALIBI does not draw a class it has not been told about.</p>
+</header>
+{% endblock %}
+
+{% block body %}
+<nav class="viewbar" aria-label="calendar view">
+  <a class="vb{% if view=='month' %} is-on{% endif %}" href="/calendar?view=month">Month</a>
+  <a class="vb{% if view=='agenda' %} is-on{% endif %}" href="/calendar?view=agenda">Agenda</a>
+  <span class="vb__n mono faint">{{ cal.events }} dated item{{ '' if cal.events == 1 else 's' }}</span>
+</nav>
+
+{% if view == 'agenda' %}
+<section class="sec" aria-label="agenda">
+  {% if cal.agenda %}
+  <ol class="stack">
+    {% for d in cal.agenda %}
+    <li class="ag">
+      <p class="ag__day{% if d.is_today %} is-today{% endif %}"><b>{{ d.day }}</b> <span>{{ d.weekday }}</span></p>
+      <ul class="ag__ev">
+        {% for e in d.events %}
+        <li><a href="/tasks#{{ e.subject }}">{{ e.course }} · {{ e.title }}</a>
+          <span class="tag">{{ 'date disputed' if e.conflicting else e.kind }}</span></li>
+        {% endfor %}
+      </ul>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  {{ empty("No dated items in this window.",
+           "Add a syllabus, a notice or a timetable and the dates it states appear here, with the sentence they
+            came from.", "Add a source", "/onboard") }}
+  {% endif %}
+</section>
+{% else %}
+<section class="grid" aria-label="month grid">
+  {% for week in cal.weeks %}
+  <div class="wk">
+    {% for d in week %}
+    <div class="day{% if d.is_today %} is-today{% endif %}{% if d.is_weekend %} is-end{% endif %}{% if not d.in_month %} is-out{% endif %}"
+         {% if d.has_event %}data-n="{{ d.n }}"{% endif %}>
+      <p class="day__n">{{ d.day }}</p>
+      <ul class="day__ev">
+        {% for e in d.events %}
+        <li><a href="/tasks#{{ e.subject }}"
+               class="ev ev--{{ 'bad' if e.conflicting else e.kind }}">{{ e.course }} {{ e.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</section>
+<p class="mini legend">
+  <span class="ev ev--deadline">deadline</span><span class="ev ev--released">released</span>
+  <span class="ev ev--question">needs you</span><span class="ev ev--bad">date disputed</span>
+</p>
+{% endif %}
+
+<p class="cal__note mini">{{ cal.timetable_note }} <a class="act" href="/onboard">Add a source</a></p>
+{% endblock %}

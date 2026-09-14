@@ -1,82 +1,110 @@
 {% extends "base.html" %}
-{% block title %}Review queue{% endblock %}
-{% block body %}
-<h1>Review queue</h1>
-<p class="sub">Signature behaviour: anything the system cannot ground, or cannot promote without a human,
-  arrives here with its evidence inline and its options priced. Nothing in this list is silently
-  guessed, and nothing leaves it without a recorded consequence.</p>
+{% block title %}Queue{% endblock %}
 
-<div class="grid g4" style="margin-bottom:12px">
-  {{ stat(rows | length, 'open', 'each deduped by (kind, subject, question)', 'warn' if rows else 'ok') }}
-  {{ stat(stats.claims_review, 'claims in review', 'not in the live plan, not deleted') }}
-  {{ stat(stats.injections_quarantined, 'quarantined payloads', 'instruction-shaped text', 'info') }}
-  {{ stat(resolved | length, 'answered', 'with consequence recorded', 'ok') }}
-</div>
-
-{% for r in rows %}
-<div class="panel" style="margin-bottom:12px">
-  <div class="row" style="justify-content:space-between">
-    <h3 style="margin:0">{{ r.question }}</h3>
-    {{ pill(r.kind, 'p-warn') }} {{ pill(r.subject_id or r.subject_type, 'p-info') }}
-  </div>
-  {% if r.why %}<p class="mini">{{ r.why }}</p>{% endif %}
-  <div class="grid g2" style="margin-top:8px">
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">review queue · {{ rows | length }} open · {{ resolved | length }} answered</p>
+  <div class="scene-grid">
     <div>
+      <h1 class="hero-line">Nothing here<br>is <em>guessed</em>.</h1>
+      <p class="sub lede" style="margin-top:20px">Anything the system cannot ground, or cannot promote without
+        a human, arrives here with its evidence inline and its options priced. Nothing in this list is
+        silently guessed, and nothing leaves it without a recorded consequence.</p>
+      <div class="hero-figures">
+        {{ stat(rows | length, 'open', 'each deduped by (kind, subject, question)', 'warn' if rows else 'ok', true) }}
+        {{ stat(stats.claims_review, 'claims in review', 'not in the live plan, not deleted') }}
+        {{ stat(stats.injections_quarantined, 'quarantined payloads', 'instruction-shaped text', 'info') }}
+        {{ stat(resolved | length, 'answered', 'with consequence recorded', 'ok') }}
+      </div>
+    </div>
+    <aside class="c-4" data-depth="3.4">
+      <p class="lead">A human decision is the highest authority tier in the policy.</p>
+      <p class="mini" style="margin-top:10px">That is why "use my answer" writes a claim with
+        <code>method=manual</code> and keeps your sentence as the receipt — it becomes auditable state, not a
+        whisper in a config file.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
+{% block body %}
+{% for r in rows %}
+<section class="obj" data-accent="warn" data-reveal data-cursor="read">
+  <div class="compose">
+    <div class="c-8">
+      <h3>{{ r.kind }}</h3>
+      <p style="font-family:var(--display);font-size:1.28rem;line-height:1.34;letter-spacing:-.015em;margin:0 0 8px">
+        {{ r.question }}</p>
+      {% if r.why %}<p class="mini">{{ r.why }}</p>{% endif %}
+      <p class="mini"><a href="/claims?q={{ r.subject_id }}">{{ r.subject_id }}</a></p>
+    </div>
+    <div class="c-4 row" style="justify-content:flex-end;align-items:flex-start">
+      {{ pill(r.kind, 'p-warn') }} {{ pill(r.subject_id or r.subject_type, 'p-info') }}
+    </div>
+
+    <div class="c-7">
       <h3>Options, with what each one costs</h3>
       {% set opts = r.options_json if r.options_json is string else (r.options or []) %}
       {% if opts %}
-      <table><tbody>
+      <div class="stack">
         {% for o in opts %}
-        <tr><td><label><input type="radio" name="chosen" value="{{ o | tojson if o is not string else o }}"
-                 form="rev{{ r.id }}" {{ 'checked' if o.chosen }}>
-          <code>{{ (o.label or o) if o is not string else o }}</code></label>
-          {% if o is not string and o.consequence %}<div class="mini">{{ o.consequence }}</div>{% endif %}</td></tr>
+        <label class="row" style="gap:12px;align-items:flex-start">
+          {# The option is chosen by its *index*, not by an inline JSON payload: a `value="{&#34;date&#34;:…}"`
+             attribute is what the first version did, and any `"` inside it truncates the attribute in the
+             parser, so the server received half a value and stored that. `POST /api/review/{id}/resolve`
+             resolves the index against the row it already trusts. #}
+          <input type="radio" name="chosen_index" value="{{ loop.index0 }}" form="rev{{ r.id }}"
+                 {{ 'checked' if o.chosen }} style="margin-top:5px"
+                 aria-label="option {{ loop.index }}: {{ (o.label or o) if o is not string else o }}">
+          <span><code>{{ (o.label or o) if o is not string else o }}</code>
+            {% if o is not string and o.consequence %}<span class="mini"> · {{ o.consequence }}</span>{% endif %}</span>
+        </label>
         {% endfor %}
-      </tbody></table>
+      </div>
       {% else %}
       <p class="mini">No candidate set — the answer is yours to type below, and it becomes the source of
         truth for this field (a human decision is the highest authority tier in the policy).</p>
       {% endif %}
-      <h3>Evidence, so you do not have to go look</h3>
-      <div class="scroll">
+      <h3 style="margin-top:18px">Evidence, so you do not have to go look</h3>
+      <div class="scroll stack">
       {% for e in (r.evidence or []) %}
-        <div class="quote" style="margin-bottom:5px">{{ e.source }}{% if e.authority is defined %}
-          · authority {{ '%.2f' | format(e.authority) }}{% endif %}
+        <div class="quote">{{ e.source }}{% if e.authority is defined %} · authority {{ '%.2f' | format(e.authority) }}{% endif %}
           {{" · " ~ e.quote if e.quote else ""}}</div>
       {% else %}<p class="mini">No structured evidence attached; see the claim link below.</p>{% endfor %}
       </div>
     </div>
-    <div>
+
+    <div class="c-5">
       <h3>Your answer</h3>
-      <form id="rev{{ r.id }}" method="post" action="/api/review/{{ r.id }}/resolve">
-        <textarea name="chosen" rows="2" cols="46"
+      <form id="rev{{ r.id }}" method="post" action="/api/review/{{ r.id }}/resolve" class="stack">
+        <textarea name="chosen" rows="2" aria-label="your answer"
           placeholder="your answer — with 'use my answer', this becomes a claim (method=manual), so write the sentence you are relying on"></textarea>
-        <div class="row" style="gap:8px;align-items:center;margin-top:4px">
+        <div class="row" style="gap:8px;align-items:center">
           <label class="mini" for="pred{{ r.id }}">your answer states the</label>
           <select id="pred{{ r.id }}" name="predicate">
             {% for opt in ["due_at", "weight", "late_policy", "submitted", "submission_channel", "venue"] %}
             <option value="{{ opt }}"{% if opt == "due_at" %} selected{% endif %}>{{ opt }}</option>
             {% endfor %}
           </select>
-          <span class="mini">a date answer is stored only if your sentence names exactly one date with a
-            year; two dates means we ask again instead of guessing.</span>
         </div>
-        <textarea name="note" rows="2" cols="46"
+        <p class="mini">a date answer is stored only if your sentence names exactly one date with a year;
+          two dates means we ask again instead of guessing.</p>
+        <textarea name="note" rows="2" aria-label="why you decided this"
           placeholder="why — this is stored as the consequence, not thrown away"></textarea>
-        <div class="row" style="margin-top:6px">
+        <div class="row" style="margin-top:4px" data-magnet="0.06">
           <button name="decision" value="accept_safety">accept safest (earliest date)</button>
-          <button name="decision" value="keep_own">use my answer</button>
-          <button name="decision" value="dismiss">dismiss, keep unverified</button>
+          <button name="decision" value="keep_own" data-variant="go">use my answer</button>
+          <button name="decision" value="dismiss" class="btn-ghost">dismiss, keep unverified</button>
         </div>
       </form>
-      <p class="mini" style="margin-top:8px">Dismissing does not delete the claim: it stays
+      <p class="mini" style="margin-top:10px">Dismissing does not delete the claim: it stays
         <code>verify_state='review'</code> and is excluded from the plan, which is a visible state in the
         header, not a hidden one.</p>
       {% if r.claim_id %}<a href="/claims?q={{ r.subject_id }}#c{{ r.claim_id }}">view claim
         {{ r.claim_id }} →</a>{% endif %}
     </div>
   </div>
-</div>
+</section>
 {% else %}
 <div class="notice">Queue is empty. The honest reading: every open claim's receipt re-verifies right now.
   It is not "the system never needs help" — with no sources ingested it also has nothing to say.</div>
@@ -84,6 +112,7 @@
 
 {% if resolved %}
 <h2>Recently answered</h2>
+<div class="ledger-wrap" data-reveal>
 <table><thead><tr><th>when</th><th>kind</th><th>subject</th><th>decision</th><th>consequence</th>
   <th>by</th></tr></thead><tbody>
 {% for r in resolved %}
@@ -91,5 +120,6 @@
   <td>{{ r.subject_id }}</td><td><code>{{ r.resolution }}</code></td>
   <td class="mini">{{ r.consequence }}</td><td class="mini">{{ r.resolved_by }}</td></tr>
 {% endfor %}</tbody></table>
+</div>
 {% endif %}
 {% endblock %}

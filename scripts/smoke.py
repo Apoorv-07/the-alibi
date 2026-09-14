@@ -27,8 +27,11 @@ sys.path.insert(0, str(ROOT))
 # derives the same list from the router, so adding a route without adding it here is a test failure
 # (`/twin` had been missing from this list while sitting in the nav bar). Ops endpoints are deliberately
 # separate: they answer with JSON and `/readyz` is *expected* to be a 503 on an empty database.
-PAGES = ["/", "/twin", "/timeline", "/claims", "/lineage", "/conflicts", "/queue", "/feasibility",
-         "/risk", "/actions", "/sources", "/privacy", "/eval", "/audit", "/settings", "/docs",
+PAGES = ["/", "/onboard", "/calendar", "/tasks", "/evidence", "/review", "/settings", "/technical",
+         # the surfaces the six destinations are made of: every one stays reachable and rendered, because a
+         # renovation that makes the receipts harder to open has failed at the only thing ALIBI promises
+         "/twin", "/timeline", "/claims", "/lineage", "/conflicts", "/queue", "/feasibility",
+         "/risk", "/actions", "/sources", "/privacy", "/eval", "/audit", "/docs", "/technical/cockpit",
          "/metrics"]
 OPS = ["/healthz", "/readyz"]
 BAD_MARKERS = ("could not render", "UndefinedError", "Traceback", "jinja2.exceptions")

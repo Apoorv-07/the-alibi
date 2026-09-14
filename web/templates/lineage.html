@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Lineage{% endblock %}
+{% block hero %}
+<header class="scene-head" data-reveal>
+  <p class="eyebrow">{{ graph.claim_ids | length }} claim(s) · {{ graph.edges | length }} edge(s) on {{ sid or 'this subject' }}</p>
+  <div class="scene-grid">
+    <div>
+      <h1 class="hero-line">Show me why<br>you <em>believe</em> this.</h1>
+      <p class="sub lede" style="margin-top:20px">Source → observation → claim → supersession → change → plan, in one list, with the engine that produced each claim labelled. The answer is rows, not prose.</p>
+    </div>
+    <aside class="c-4" data-depth="3.1">
+      <p class="lead">Every edge was written when it happened.</p>
+      <p class="mini" style="margin-top:10px">Not reconstructed from a summary afterwards — which is why an edge you can click is stronger evidence than a paragraph you cannot.</p>
+    </aside>
+  </div>
+</header>
+{% endblock %}
+
 {% block body %}
-<h1>Claim lineage</h1>
-<p class="sub">"Show me why you believe this", answered with rows. Source → observation → claim →
-  supersession → change → plan, in one table, with the engine that produced each claim labelled.</p>
+
 <form class="inline" method="get">
   <label class="mini">subject</label>
   <select name="subject_id" onchange="this.form.submit()">
@@ -12,7 +26,7 @@
   <span class="mini">{{ graph.claim_ids | length }} claim(s), {{ graph.edges | length }} edge(s)</span>
 </form>
 
-<table>
+<div class="ledger-wrap"><table>
 <thead><tr><th>claim</th><th>predicate</th><th>value</th><th>state</th><th>engine</th><th>authority</th>
   <th>checks the verifier ran</th><th>quote</th><th>lineage</th></tr></thead>
 <tbody>
@@ -38,7 +52,7 @@
 {% else %}
 <tr><td colspan="9" class="mini">No claims for this subject.</td></tr>
 {% endfor %}
-</tbody></table>
+</tbody></table></div>
 
 <div class="panel" style="margin-top:12px">
   <h3>Edges on this subject</h3>
