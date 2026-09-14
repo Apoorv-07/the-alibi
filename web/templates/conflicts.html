@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Conflicts{% endblock %}
+{% block body %}
+<h1>Conflicts</h1>
+<p class="sub">Signature behaviour: when sources disagree, the twin does not average them, does not pick
+  the newest, and does not silently delete the loser. It explains the disagreement, keeps both
+  receipts, plans against the safest value, and tells you exactly what would change your mind.</p>
+
+{% if rows %}
+{% for r in rows %}
+{% set ex = r.ex %}
+<div class="panel" style="margin-bottom:12px">
+  <div class="row" style="justify-content:space-between">
+    <h3 style="margin:0"><a href="/lineage?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a>
+      · {{ r.predicate }}</h3>
+    <span>{{ pill(r.state) }} {{ pill(r.severity, 'p-bad' if r.severity=='HIGH' else 'p-warn') }}
+      {% if r.kind %}{{ pill(r.kind) }}{% endif %}</span>
+  </div>
+  <p class="mini" style="margin:6px 0 8px">{{ ex.what }}
+    {% if ex.spread_days %} · spread {{ ex.spread_days }} day(s){% endif %}
+    · rule <b>{{ ex.rule }}</b></p>
+
+  <table>
+  <thead><tr><th>source</th><th>authority</th><th>asserted</th><th>quote</th><th>said / ingested</th>
+    <th>verdict</th></tr></thead>
+  <tbody>
+  {% for row in ex.rows %}
+    <tr>
+      <td><b>{{ row.source }}</b><div class="mini">{{ row.source_kind }}</div></td>
+      <td class="num">{{ '%.2f' | format(row.authority) if row.authority is not none else '—' }}</td>
+      <td><code>{{ row.value | tojson }}</code></td>
+      <td style="max-width:38ch"><div class="quote">{{ row.quote[:180] }}</div></td>
+      <td class="mini">{{ row.said_at or '—' }}<br>{{ row.ingested_at or '—' }}</td>
+      <td>{{ pill(row.verdict, 'p-hi' if 'PLANNED' in row.verdict else ('p-vio' if 'historical' in row.verdict else 'p-warn')) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody></table>
+
+  <div class="grid g2" style="margin-top:10px">
+    <div>
+      <h3>Why the twin believes this more</h3>
+      <p class="mini">{{ ex.why }}</p>
+      <h3>What is still uncertain</h3>
+      <p class="mini">{{ ex.uncertain }}</p>
+    </div>
+    <div>
+      <h3>Plan against</h3>
+      <p><code>{{ ex.plan_against | tojson }}</code></p>
+      <h3>What you should do</h3>
+      <p class="mini">{{ ex.do }}</p>
+      <p class="mini">{{ pill('silent deletion: ' ~ ('no' if not ex.silent_deletion else 'YES — BUG'), 'p-hi' if not ex.silent_deletion else 'p-bad') }}</p>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="row" style="justify-content:space-between">
+    <span class="mini">Every side above is still a row in <code>claim</code>. Resolving a conflict adds
+      a <code>change_event</code>; it never removes evidence.</span>
+    <form class="inline" method="post" action="/api/review/{{ ex.review_id or 0 }}/resolve">
+      <input type="hidden" name="chosen" value="{{ ex.plan_against | tojson }}">
+      <button name="decision" value="accept_safety">keep safest value</button>
+      <button name="decision" value="keep_own">record my own answer</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="notice">No open conflicts. Two ways that can be true: the sources agree, or only one source
+  has been synced. <a href="/">Cockpit → sync</a> ingests the whole demo corpus, including a
+  WhatsApp line that contradicts the syllabus.</div>
+{% endif %}
+
+<div class="panel" style="margin-top:12px">
+  <h3>The rule, in one sentence</h3>
+  <p class="mini" style="max-width:96ch">Supersession = recency <b>within</b> an authority tier; across
+    tiers only a source at or above <code>supersede_trust_floor</code> may retire another, and a weaker
+    source that tries to overwrite a stronger one escalates to a review item instead of updating the
+    plan. Recency alone would let last night's rumour beat a signed circular — which is the single most
+    dangerous "smart" behaviour an academic assistant can have.</p>
+</div>
+{% endblock %}

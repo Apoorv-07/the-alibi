@@ -1,0 +1,605 @@
+{
+ "corpus": {
+  "blocks": 20,
+  "gold_tasks": 9,
+  "planted_conflicts": 4,
+  "planted_injections": 1
+ },
+ "variants": {
+  "oracle": {
+   "claims_emitted": 14,
+   "date_claims": 13,
+   "corpus_assertions": 14,
+   "coverage": 1.0,
+   "claim_recall": 0.929,
+   "gold_date_present": 1.0,
+   "missed_tasks": [],
+   "grounded": 14,
+   "refused": 0,
+   "verifier_pass_rate": 1.0,
+   "refusals": {},
+   "reconciled_correct": 9,
+   "reconciled_total": 9,
+   "rows": [
+    {
+     "task": "dbms_lab4",
+     "reconciled": "2026-10-11",
+     "expected": "2026-10-11",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "os_assign3",
+     "reconciled": "2026-10-12",
+     "expected": "2026-10-12",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "daa_assign4",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-16",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "os_ia2",
+     "reconciled": "2026-10-15",
+     "expected": "2026-10-15",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "dbms_ia2",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-16",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "dbms_project",
+     "reconciled": "2026-10-30",
+     "expected": "2026-10-30",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_reg",
+     "reconciled": "2026-09-24",
+     "expected": "2026-09-24",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "sih_idea",
+     "reconciled": "2026-10-05",
+     "expected": "2026-10-05",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_present",
+     "reconciled": "2026-10-09",
+     "expected": "2026-10-09",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    }
+   ],
+   "conflicts_detected": 4,
+   "conflicts_planted": 4,
+   "conflict_ids": [
+    "dbms_ia2",
+    "dbms_lab4",
+    "os_assign3",
+    "sih_reg"
+   ],
+   "severities": {
+    "dbms_ia2": "MEDIUM",
+    "dbms_lab4": "MEDIUM",
+    "os_assign3": "MEDIUM",
+    "sih_reg": "MED"
+   },
+   "review_queue": 0,
+   "ms": 9
+  },
+  "rules_only": {
+   "claims_emitted": 2,
+   "date_claims": 0,
+   "corpus_assertions": 14,
+   "coverage": 0.0,
+   "claim_recall": 0.0,
+   "gold_date_present": 0.0,
+   "missed_tasks": [
+    "daa_assign4",
+    "dbms_ia2",
+    "dbms_lab4",
+    "dbms_project",
+    "os_assign3",
+    "os_ia2",
+    "sih_idea",
+    "sih_present",
+    "sih_reg"
+   ],
+   "grounded": 2,
+   "refused": 0,
+   "verifier_pass_rate": 1.0,
+   "refusals": {},
+   "reconciled_correct": 0,
+   "reconciled_total": 9,
+   "rows": [
+    {
+     "task": "dbms_lab4",
+     "reconciled": null,
+     "expected": "2026-10-11",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "os_assign3",
+     "reconciled": null,
+     "expected": "2026-10-12",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "daa_assign4",
+     "reconciled": null,
+     "expected": "2026-10-16",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "os_ia2",
+     "reconciled": null,
+     "expected": "2026-10-15",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "dbms_ia2",
+     "reconciled": null,
+     "expected": "2026-10-16",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "dbms_project",
+     "reconciled": null,
+     "expected": "2026-10-30",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_reg",
+     "reconciled": null,
+     "expected": "2026-09-24",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_idea",
+     "reconciled": null,
+     "expected": "2026-10-05",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_present",
+     "reconciled": null,
+     "expected": "2026-10-09",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    }
+   ],
+   "conflicts_detected": 0,
+   "conflicts_planted": 4,
+   "conflict_ids": [],
+   "severities": {},
+   "review_queue": 0,
+   "ms": 1
+  },
+  "rules_line": {
+   "claims_emitted": 10,
+   "date_claims": 10,
+   "corpus_assertions": 14,
+   "coverage": 0.667,
+   "claim_recall": 0.714,
+   "gold_date_present": 0.667,
+   "missed_tasks": [
+    "dbms_project",
+    "sih_idea",
+    "sih_present"
+   ],
+   "grounded": 10,
+   "refused": 0,
+   "verifier_pass_rate": 1.0,
+   "refusals": {},
+   "reconciled_correct": 5,
+   "reconciled_total": 9,
+   "rows": [
+    {
+     "task": "dbms_lab4",
+     "reconciled": "2026-10-11",
+     "expected": "2026-10-11",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "os_assign3",
+     "reconciled": "2026-10-12",
+     "expected": "2026-10-12",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "daa_assign4",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-16",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "os_ia2",
+     "reconciled": "2026-08-28",
+     "expected": "2026-10-15",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "dbms_ia2",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-16",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "dbms_project",
+     "reconciled": null,
+     "expected": "2026-10-30",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_reg",
+     "reconciled": "2026-09-24",
+     "expected": "2026-09-24",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "sih_idea",
+     "reconciled": null,
+     "expected": "2026-10-05",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    },
+    {
+     "task": "sih_present",
+     "reconciled": null,
+     "expected": "2026-10-09",
+     "ok": false,
+     "rule": "single",
+     "n_sources": 1
+    }
+   ],
+   "conflicts_detected": 3,
+   "conflicts_planted": 4,
+   "conflict_ids": [
+    "dbms_ia2",
+    "os_assign3",
+    "os_ia2",
+    "sih_reg"
+   ],
+   "severities": {
+    "dbms_ia2": "MEDIUM",
+    "os_assign3": "MEDIUM",
+    "os_ia2": "MED",
+    "sih_reg": "MED"
+   },
+   "review_queue": 0,
+   "ms": 11
+  },
+  "naive_attribution": {
+   "claims_emitted": 25,
+   "date_claims": 24,
+   "corpus_assertions": 14,
+   "coverage": 1.0,
+   "claim_recall": 1.0,
+   "gold_date_present": 0.778,
+   "missed_tasks": [],
+   "grounded": 25,
+   "refused": 0,
+   "verifier_pass_rate": 1.0,
+   "refusals": {},
+   "reconciled_correct": 2,
+   "reconciled_total": 9,
+   "rows": [
+    {
+     "task": "dbms_lab4",
+     "reconciled": "2026-09-18",
+     "expected": "2026-10-11",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 3
+    },
+    {
+     "task": "os_assign3",
+     "reconciled": "2026-09-18",
+     "expected": "2026-10-12",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 3
+    },
+    {
+     "task": "daa_assign4",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-16",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 1
+    },
+    {
+     "task": "os_ia2",
+     "reconciled": "2026-09-22",
+     "expected": "2026-10-15",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 4
+    },
+    {
+     "task": "dbms_ia2",
+     "reconciled": "2026-09-22",
+     "expected": "2026-10-16",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 4
+    },
+    {
+     "task": "dbms_project",
+     "reconciled": "2026-10-16",
+     "expected": "2026-10-30",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "sih_reg",
+     "reconciled": "2026-09-18",
+     "expected": "2026-09-24",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 3
+    },
+    {
+     "task": "sih_idea",
+     "reconciled": "2026-10-05",
+     "expected": "2026-10-05",
+     "ok": true,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    },
+    {
+     "task": "sih_present",
+     "reconciled": "2026-10-05",
+     "expected": "2026-10-09",
+     "ok": false,
+     "rule": "earliest_safe",
+     "n_sources": 2
+    }
+   ],
+   "conflicts_detected": 4,
+   "conflicts_planted": 4,
+   "conflict_ids": [
+    "dbms_ia2",
+    "dbms_lab4",
+    "dbms_project",
+    "os_assign3",
+    "os_ia2",
+    "sih_idea",
+    "sih_present",
+    "sih_reg"
+   ],
+   "severities": {
+    "dbms_ia2": "MED",
+    "dbms_lab4": "MED",
+    "dbms_project": "MED",
+    "os_assign3": "MED",
+    "os_ia2": "MED",
+    "sih_idea": "MED",
+    "sih_present": "MED",
+    "sih_reg": "MED"
+   },
+   "review_queue": 0,
+   "ms": 4
+  }
+ },
+ "ours": {
+  "overloads": 5,
+  "flagged": 5,
+  "fixable_by_one_lever": 2,
+  "honestly_unfixable": 3,
+  "feasible_if_safety_relaxed": 5,
+  "safety_binding": 5,
+  "cases": [
+   {
+    "case": "overload-1",
+    "status": "INFEASIBLE",
+    "core_lines": 1,
+    "shortfall_h": 4.0,
+    "remedies": 3,
+    "remedies_that_work": 0,
+    "control_full_feasible": false,
+    "feasible_if_safety_relaxed": true,
+    "safety_binding": true
+   },
+   {
+    "case": "overload-2",
+    "status": "INFEASIBLE",
+    "core_lines": 1,
+    "shortfall_h": 3.0,
+    "remedies": 3,
+    "remedies_that_work": 0,
+    "control_full_feasible": false,
+    "feasible_if_safety_relaxed": true,
+    "safety_binding": true
+   },
+   {
+    "case": "overload-3",
+    "status": "INFEASIBLE",
+    "core_lines": 1,
+    "shortfall_h": 2.5,
+    "remedies": 3,
+    "remedies_that_work": 0,
+    "control_full_feasible": false,
+    "feasible_if_safety_relaxed": true,
+    "safety_binding": true
+   },
+   {
+    "case": "overload-4",
+    "status": "INFEASIBLE",
+    "core_lines": 1,
+    "shortfall_h": 2.0,
+    "remedies": 3,
+    "remedies_that_work": 2,
+    "control_full_feasible": false,
+    "feasible_if_safety_relaxed": true,
+    "safety_binding": true
+   },
+   {
+    "case": "overload-5",
+    "status": "INFEASIBLE",
+    "core_lines": 1,
+    "shortfall_h": 1.5,
+    "remedies": 3,
+    "remedies_that_work": 2,
+    "control_full_feasible": false,
+    "feasible_if_safety_relaxed": true,
+    "safety_binding": true
+   }
+  ]
+ },
+ "baseline_naive_transcription": {
+  "plans": 5,
+  "flagged_broken": 5,
+  "rows": [
+   {
+    "case": "overload-1",
+    "flagged_as_broken": true,
+    "under_allocated": false,
+    "worst_overrun_h": 3.5,
+    "hours_claimed_total": 17.0,
+    "hours_required_total": 17.0,
+    "lines_parsed": 4,
+    "raw_head": "Sun 11 Oct: DBMS Lab 4 (6.0 hours)"
+   },
+   {
+    "case": "overload-2",
+    "flagged_as_broken": true,
+    "under_allocated": false,
+    "worst_overrun_h": 3.0,
+    "hours_claimed_total": 17.0,
+    "hours_required_total": 17.0,
+    "lines_parsed": 4,
+    "raw_head": "Sun 11 Oct: DBMS Lab 4 (6.0 hours)"
+   },
+   {
+    "case": "overload-3",
+    "flagged_as_broken": true,
+    "under_allocated": false,
+    "worst_overrun_h": 2.5,
+    "hours_claimed_total": 17.0,
+    "hours_required_total": 17.0,
+    "lines_parsed": 4,
+    "raw_head": "Sun 11 Oct: DBMS Lab 4 (6.0 hours)"
+   },
+   {
+    "case": "overload-4",
+    "flagged_as_broken": true,
+    "under_allocated": false,
+    "worst_overrun_h": 2.0,
+    "hours_claimed_total": 17.0,
+    "hours_required_total": 17.0,
+    "lines_parsed": 4,
+    "raw_head": "Sun 11 Oct: DBMS Lab 4 (6.0 hours)"
+   },
+   {
+    "case": "overload-5",
+    "flagged_as_broken": true,
+    "under_allocated": false,
+    "worst_overrun_h": 1.5,
+    "hours_claimed_total": 17.0,
+    "hours_required_total": 17.0,
+    "lines_parsed": 4,
+    "raw_head": "Sun 11 Oct: DBMS Lab 4 (6.0 hours)"
+   }
+  ],
+  "gold_plan_correct": null,
+  "note": "deterministic transcription",
+  "detected_infeasible": 5
+ },
+ "injection": {
+  "rows": [
+   {
+    "case": "legal claim, same source",
+    "promoted": true,
+    "reason": "grounded",
+    "as_expected": true
+   },
+   {
+    "case": "payload under allowed predicate",
+    "promoted": true,
+    "reason": "grounded",
+    "as_expected": false
+   },
+   {
+    "case": "payload as venue",
+    "promoted": false,
+    "reason": "instructional_value_refused",
+    "as_expected": true
+   },
+   {
+    "case": "honest correction is still allowed",
+    "promoted": true,
+    "reason": "grounded",
+    "as_expected": true
+   }
+  ],
+  "all_as_expected": false,
+  "detected_by_ingest_marker": false
+ },
+ "provenance": {
+  "oracle": "deterministic oracle through alibi.link \u2014 proves the ledger/reconciler/verifier chain, NOT a model result. No model needed a key to run here.",
+  "rules_only": "deterministic preparse only; this is the measured answer to 'do you even need an LLM for this corpus?'",
+  "rules_line": "the shipped no-model path (alibi.taskfacts line-level attribution, same verifier, same reconciler); no oracle, no model, no tuning per document",
+  "naive_attribution": "control condition: same corpus, same verifier, same reconciler, attribution by line instead of by proximity. Isolates the cost of skipping alibi.link.",
+  "ours": "CP-SAT analyze() + two controls on 5 planted overloads \u2014 executed here, no model",
+  "baseline_naive_transcription": "PLACEHOLDER plan generator (no model), used to validate the *checker*. It is not evidence about ChatGPT \u2014 that row needs --plan-bot llm with a provider on the laptop.",
+  "injection": "executed here against alibi.ground + alibi.router (no model needed)"
+ }
+}

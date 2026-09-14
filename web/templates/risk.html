@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Risk{% endblock %}
+{% block body %}
+<h1>Risk</h1>
+<p class="sub">Two kinds of bad news, kept in separate columns for the whole design: what is
+  <b>proven</b> (a solver exhausted the possibilities) and what is <b>forecast</b> (a model projects a
+  breach). A forecast never borrows the certainty of a proof, and a proof never gets a percentage.</p>
+
+<div class="grid g4" style="margin-bottom:12px">
+  {% set proven = rows | selectattr('status','eq','PROVEN_INFEASIBLE') | list %}
+  {% set atrisk = rows | selectattr('status','eq','AT_RISK') | list %}
+  {% set pend = rows | selectattr('status','eq','PENDING') | list %}
+  {{ stat(proven | length, 'proven infeasible', 'from the solver, not a model', 'bad' if proven else 'ok') }}
+  {{ stat(atrisk | length, 'at risk (forecast)', 'probability from a named model', 'warn' if atrisk else 'ok') }}
+  {{ stat(pend | length, 'pending data', 'model declined to guess', 'info') }}
+  {{ stat(rows | sum(attribute='is_prediction') if rows else 0, 'prediction rows', 'the rest are computed state') }}
+</div>
+
+<table>
+<thead><tr><th>status</th><th>subject</th><th>horizon</th><th class="num">probability</th>
+  <th>method</th><th>basis (inputs, not vibes)</th><th>what to do</th><th>kind</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr>
+  <td>{{ pill(r.status, 'p-bad' if r.status=='PROVEN_INFEASIBLE' else ('p-warn' if r.status=='AT_RISK' else ('p-info' if r.status=='PENDING' else 'p-hi'))) }}</td>
+  <td><a href="/lineage?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a>
+      <div class="mini">{{ r.subject_type }}</div></td>
+  <td class="mini">{{ r.horizon_start }}<br>→ {{ r.horizon_end }}</td>
+  <td class="num">{% if r.probability %}{{ (r.probability * 100) | round(0) }}%
+    {% else %}<span class="mini">none — this is not a forecast</span>{% endif %}</td>
+  <td>{{ r.method }}<div class="mini">{{ r.computed_at[11:19] if r.computed_at else '' }}</div></td>
+  <td style="max-width:40ch"><pre>{{ r.basis | tojson }}</pre></td>
+  <td class="mini">{{ r.recommendation }}</td>
+  <td>{{ pill('prediction' if r.is_prediction else 'computed', 'p-warn' if r.is_prediction else 'p-hi') }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="mini">No forecast rows yet. The pipeline writes one per run — run a sync.</td></tr>
+{% endfor %}
+</tbody></table>
+
+<div class="grid g2" style="margin-top:12px">
+  <div class="panel">
+    <h3>Why "pending" is a state, not a failure</h3>
+    <p class="mini" style="max-width:92ch">A gauge that reads 62% on day one of a term is a lie with good
+      typography. When the attendance denominator is not on record, or there is no history to calibrate
+      against, the model returns PENDING with the reason — and the UI shows the reason. The first honest
+      version of this product must be able to say "I cannot tell you yet"; the moment that costs nothing
+      to say, every number on this page means something.</p>
+  </div>
+  <div class="panel">
+    <h3>Self-measured calibration</h3>
+    <p class="mini">The rate below is computed from <code>risk_forecast</code> rows that a later
+      <code>change_event</code> resolved. Until at least 5 of our own predictions have resolved, the
+      field is blank by design and says so.</p>
+    {% if rows %}
+    <pre>{% for r in rows[:3] %}{{ r.method }} · {{ r.status }} · basis keys: {{ r.basis.keys() | list | join(', ') }}
+{% endfor %}</pre>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

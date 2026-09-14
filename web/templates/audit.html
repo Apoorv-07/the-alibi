@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Audit{% endblock %}
+{% block body %}
+<h1>Audit &amp; runs</h1>
+<p class="sub">Who changed what, and what each sync cost. The run table is the honest version of
+  "the system is fast": calls, bytes and milliseconds per run, aggregated from rows rather than
+  reported by the code that made them.</p>
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(runs | length, 'runs', 'each is one sync or ingest') }}
+  {{ stat(runs | map(attribute="llm_calls") | sum if runs else 0, 'llm calls', 'all time', 'info') }}
+  {{ stat(runs | map(attribute="cloud_calls") | sum if runs else 0, 'cloud calls', 'all time', 'warn') }}
+  {{ stat(rows | length, 'audit rows', 'shown: latest ' ~ rows | length) }}
+</div>
+
+<h2>Runs</h2>
+<table><thead><tr><th>#</th><th>trigger</th><th>state</th><th>started</th><th class="num">claims in</th>
+ <th class="num">grounded</th><th class="num">review</th><th class="num">conflicts</th>
+ <th class="num">local/cloud</th><th class="num">tokens</th><th class="num">ms</th><th>solver</th>
+ <th>error</th></tr></thead><tbody>
+{% for r in runs %}
+<tr><td class="num">{{ r.id }}</td><td>{{ r.trigger }}<div class="mini">{{ (r.finished_at or '')[11:19] }}</div></td>
+  <td>{{ pill(r.state, 'p-hi' if r.state=='done' else ('p-bad' if r.state=='failed' else 'p-warn')) }}</td>
+  <td class="mini">{{ r.started_at }}</td>
+  <td class="num">{{ r.claims_in }}</td><td class="num">{{ r.claims_grounded }}</td>
+  <td class="num">{{ r.claims_review }}</td><td class="num">{{ r.conflicts_found }}</td>
+  <td class="num">{{ r.local_calls }}/{{ r.cloud_calls }}</td>
+  <td class="num">{{ (r.tokens_in or 0) + (r.tokens_out or 0) }}</td>
+  <td class="num">{{ r.gpu_ms or 0 }}</td>
+  <td class="mini">{{ r.solver_status or '—' }}</td>
+  <td class="mini">{{ (r.error or '')[:60] }}</td></tr>
+{% else %}<tr><td colspan="13" class="mini">No runs recorded.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Audit log</h2>
+<table><thead><tr><th>at</th><th>who</th><th>entity</th><th>op</th><th>before</th><th>after</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr><td class="mini">{{ r.at }}</td><td><b>{{ r.who }}</b></td>
+  <td class="mini">{{ r.entity }}<br>{{ r.entity_id }}</td><td>{{ r.op }}</td>
+  <td><pre class="mini">{{ (r.before or '')[:220] }}</pre></td>
+  <td><pre class="mini">{{ (r.after or '')[:220] }}</pre></td></tr>
+{% else %}<tr><td colspan="6" class="mini">Empty — nothing has been decided yet.</td></tr>{% endfor %}
+</tbody></table>
+<p class="mini">Writes to <code>audit</code> happen in the same transaction as the state change they
+  describe, so an entry here without a matching row (or the reverse) is a bug we want reported.</p>
+{% endblock %}

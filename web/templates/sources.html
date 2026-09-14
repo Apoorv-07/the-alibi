@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Sources{% endblock %}
+{% block body %}
+<h1>Sources</h1>
+<p class="sub">Content-addressed artifacts, what the system did with each, and what it could not read.
+  Re-syncing the same bytes creates no new rows — that is why a crash mid-demo is a retry, not a
+  corrupted ledger.</p>
+<div class="row" style="margin-bottom:10px">
+  <form method="post" action="/api/ingest" enctype="multipart/form-data" class="panel" style="flex:1">
+    <b class="mini">ingest a real artifact</b>
+    <div class="row" style="margin-top:6px">
+      <input type="file" name="file" required>
+      <select name="kind">
+        {% for k in ('auto','syllabus_text','notice_photo','whatsapp','erp_table','ics','email','assignment_sheet','manual_entry') %}
+        <option>{{ k }}</option>{% endfor %}
+      </select>
+      <input name="label" placeholder="label (used as the course hint)" size="22">
+      <button>ingest</button>
+    </div>
+    <p class="mini" style="margin:6px 0 0">PDFs and images go through the OCR path when available and
+      fall back to a review item when it is not — a page we cannot read never becomes a claim. Max 4 MB.
+      Nothing is uploaded anywhere: this form posts to your own container.</p>
+  </form>
+  <form method="post" action="/api/sync" class="panel" style="width:220px">
+    <b class="mini">demo corpus</b>
+    <p class="mini">6 artifacts: 3 syllabi, a class-group export (with an injection payload in it), a
+      notice-board photo, an ERP screen.</p>
+    <button>⟳ sync all</button>
+  </form>
+</div>
+
+<table>
+<thead><tr><th>#</th><th>label</th><th>adapter kind</th><th>stored as</th><th class="num">chars</th>
+  <th class="num">claims</th><th>prior trust</th><th>status</th><th>captured</th><th>raw text</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr>
+  <td class="num">{{ r.id }}</td>
+  <td><b>{{ r.label or r.orig_kind }}</b>
+    <div class="mini"><a href="/claims?q={{ r.label }}">{{ r.orig_kind }}</a></div></td>
+  <td>{{ pill(r.orig_kind or r.kind) }}</td>
+  <td class="mini">{{ r.kind }}</td>
+  <td class="num">{{ r.chars }}</td>
+  <td class="num">{{ r.claims }}</td>
+  <td class="num">{{ '%.2f' | format(r.trust_prior) }}</td>
+  <td>{{ pill(r.status, 'p-hi' if r.status=='parsed' else 'p-warn') }}</td>
+  <td class="mini">{{ r.captured_at }}</td>
+  <td class="mini">{% if r.purged_at %}{{ pill('purged ' ~ r.purged_at[:10], 'p-info') }}
+    {% else %}on disk{% endif %}</td>
+</tr>
+{% else %}<tr><td colspan="10" class="mini">No sources ingested.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Observations (what was actually looked at)</h2>
+<p class="mini">An observation is one read of one artifact region: a chat line, a PDF table row, an OCR
+  block, an ICS field. Claims cite them, so "when did we see this, and did the read succeed" is
+  answerable without re-running anything.</p>
+<div class="scroll">
+<table><thead><tr><th>#</th><th>kind</th><th>offset</th><th class="num">chars</th><th>status</th>
+  <th>content hash</th><th>source</th></tr></thead><tbody>
+{% for o in obs %}
+<tr><td class="num">{{ o.id }}</td><td>{{ o.kind }}</td>
+  <td class="num">{{ o.offset_start }}</td><td class="num">{{ o.chars }}</td>
+  <td>{{ pill(o.status, 'p-hi' if o.status=='parsed' else ('p-bad' if o.status=='failed' else 'p-warn')) }}</td>
+  <td class="mini">{{ (o.content_hash or '')[:12] }}</td>
+  <td class="num">{{ o.source_id or '∅' }}</td></tr>
+{% else %}<tr><td colspan="7" class="mini">none</td></tr>{% endfor %}
+</tbody></table>
+</div>
+{% endblock %}

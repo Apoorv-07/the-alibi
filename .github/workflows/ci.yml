@@ -1,0 +1,109 @@
+name: ci
+# The checks a reviewer would run by hand, in the order they would run them: the launcher's own diagnostics,
+# unit tests, the focused probes, the harness (whose numbers the pitch rests on), then the render smoke test
+# against a database that starts empty, then the same smoke test against a live HTTP server.
+#
+# Nothing here needs a GPU, an API key, a model or a network beyond pip. Two deliberate traps are covered:
+# `make checks` must not silently no-op because a *directory* of that name exists (hence .PHONY), and the
+# migration must be re-runnable against a database that already has data (CI's second job does exactly that).
+on:
+  push: {branches: [main]}
+  pull_request:
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13", cache: pip}
+      - run: pip install -r requirements.txt
+      - name: dev launcher reports its environment honestly
+        run: |
+          make dev-check | tee /tmp/dev.txt
+          grep -q "solver      present" /tmp/dev.txt
+          grep -qi "LM Studio   not configured" /tmp/dev.txt
+          grep -q "false trust 0" /tmp/dev.txt || grep -q "empty → ingesting" /tmp/dev.txt
+      - name: unit tests
+        run: python3 -m pytest tests/ -q
+      - name: verifier + attribution + calibration probes
+        run: |
+          python3 checks/check_ground.py
+          python3 checks/check_link.py
+          python3 checks/calibrate.py
+      - name: eval harness (regenerates EVAL_REPORT)
+        run: |
+          python3 evaluation/harness.py --out EVAL_REPORT.md
+          python3 - <<'PY'
+          import json
+          d = json.load(open("EVAL_REPORT.json"))
+          o = d["variants"]["oracle"]
+          assert o["verifier_pass_rate"] == 1.0, o
+          assert o["conflicts_detected"] == o["conflicts_planted"], o
+          assert d["injection"]["all_as_expected"], d["injection"]
+          # The shipped no-model floor must be reported, not the oracle's number. If `rules_line` ever
+          # disappears from the report, the readme's honesty claim about which row is "us" is false.
+          rl = d["variants"]["rules_line"]
+          assert rl["verifier_pass_rate"] == 1.0, rl
+          assert rl["reconciled_correct"] >= o["reconciled_correct"] * 0.4, rl
+          PY
+      - name: smoke (boot empty, seed, render every page)
+        run: python3 scripts/smoke.py
+      - name: the app answers over HTTP too
+        run: |
+          ALIBI_DB=/tmp/ci.db python3 -m uvicorn alibi.server:app --port 8000 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 1; done
+          python3 scripts/smoke.py --url http://127.0.0.1:8000
+          curl -fsS http://127.0.0.1:8000/metrics | grep -E "false_trust_count|cloud_bytes" | tee /tmp/m
+          test "$(grep '^alibi_false_trust_count' /tmp/m | awk '{print $2}')" = "0"
+          test "$(grep '^alibi_cloud_bytes' /tmp/m | awk '{print $2}')" = "0"
+          python3 - <<'PY'
+          import json, urllib.request
+          h = json.load(urllib.request.urlopen("http://127.0.0.1:8000/api/health"))
+          # AI must be reported as *degraded* (simulator) or unavailable — never "healthy" without a model,
+          # and never "unavailable" when the fallback engine is running. This is the assertion that keeps
+          # the health page honest rather than green.
+          ai = h["components"]["ai"]
+          assert ai["state"] in ("degraded", "unavailable", "healthy"), h
+          if h.get("simulated_extraction"):
+              assert ai["state"] == "degraded", h
+              assert "simulator" in ai["detail"], ai
+          assert h["components"]["verifier"]["state"] == "healthy", h
+          assert h["components"]["egress"]["state"] == "closed", h
+          a = json.load(urllib.request.urlopen("http://127.0.0.1:8000/api/ai-check"))
+          assert a["verdict"] in ("simulated", "real_model", "ai_unavailable"), a
+          for k in ("database", "ledger", "ai", "solver", "egress", "queue"):
+              assert k in h["components"], h["components"].keys()
+          PY
+      - name: enhancement layers are served locally, and the page is correct without them
+        run: |
+          curl -fsS http://127.0.0.1:8000/static/alibi.css | grep -q -- "--panel"
+          curl -fsS http://127.0.0.1:8000/static/alibi.js | grep -q "toast"
+          ! grep -rE 'src="https?://|href="https?://' web/templates/ | grep -v example
+          ! grep -E '\.innerHTML\s*=|document\.write' web/static/alibi.js
+      - name: a second start on the same database re-runs nothing and corrupts nothing
+        run: |
+          python3 - <<'PY'
+          from alibi.db import DB
+          d = DB("/tmp/ci.db")
+          before = d.stats()["claims"]
+          assert d.migrate() == [], "migrations must be recorded the first time"
+          assert d.stats()["claims"] == before
+          assert d.stats()["false_trust_count"] == 0
+          assert not d.conn.execute("PRAGMA foreign_key_check").fetchall()
+          PY
+      - name: retention and wipe contracts (the two legal-shaped jobs)
+        run: |
+          python3 - <<'PY'
+          import sqlite3
+          c = sqlite3.connect("/tmp/ci.db")
+          c.execute("UPDATE source_meta SET captured_at='2024-01-01T09:00:00+05:30'"); c.commit()
+          import os
+          os.environ["ALIBI_DB"] = "/tmp/ci.db"
+          from alibi.twin import Twin
+          t = Twin.open("/tmp/ci.db")
+          r = t.run_retention(days=30, now="2026-09-13")
+          assert r["sources_purged"] > 0 and r["false_trust_count"] == 0, r
+          assert t.db.stats()["unverifiable"] > 0, "a purge must be visible as a loss, not as clean data"
+          t.db.close()
+          PY

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Actions{% endblock %}
+{% block body %}
+<h1>Actions &amp; approvals</h1>
+<p class="sub">Bounded autonomy. A risk class decides what may happen; a solver proof decides whether it
+  is worth doing; a human decides anything that leaves this machine. Nothing below was authorised by a
+  model's confidence — there is no such input.</p>
+
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(rows | length, 'requests', 'this database, all time') }}
+  {{ stat(rows | selectattr('status','eq','pending') | list | length, 'awaiting you', 'class C and D stop here', 'warn') }}
+  {{ stat(rows | selectattr('status','eq','executed') | list | length, 'executed', 'reversible, local only', 'ok') }}
+  {{ stat(rows | selectattr('policy_decision','eq','REFUSED') | list | length, 'refused by policy', 'never attempted', 'info') }}
+</div>
+
+<table>
+<thead><tr><th>#</th><th>kind</th><th>risk class</th><th>target</th><th>policy</th><th>why (verbatim)</th>
+  <th>claims cited</th><th>solver</th><th>status</th><th>decide</th></tr></thead>
+<tbody>
+{% for a in rows %}
+<tr>
+  <td class="num">{{ a.id }}</td>
+  <td><b>{{ a.kind }}</b></td>
+  <td>{{ pill(a.risk_class, 'p-bad' if a.risk_class in ('HIGH_IMPACT_WRITE','IRREVERSIBLE') else 'p-hi') }}</td>
+  <td class="mini">{{ a.target or '—' }}</td>
+  <td>{{ pill(a.policy_decision, 'p-hi' if a.policy_decision=='AUTO_OK' else ('p-warn' if a.policy_decision=='APPROVAL_REQUIRED' else 'p-bad')) }}</td>
+  <td style="max-width:38ch"><div class="mini">{{ a.policy_reason[:220] }}</div>
+    <pre class="mini" style="margin-top:4px">{{ a.justification[:400] }}</pre></td>
+  <td class="mini">{% for cid in a.supporting_claims %}<a href="/claims?q=#c{{ cid }}">#{{ cid }}</a>
+    {% if not loop.last %}, {% endif %}{% else %}none → refused{% endfor %}</td>
+  <td class="mini">{{ a.solver_status or '—' }}</td>
+  <td>{{ pill(a.status, 'p-hi' if a.status in ('executed','approved') else ('p-warn' if a.status=='pending' else 'p-bad')) }}
+    {% if a.executor_result %}<div class="mini">{{ a.executor_result[:120] }}</div>{% endif %}</td>
+  <td>
+    {% if a.status == 'pending' and a.policy_decision == 'APPROVAL_REQUIRED' %}
+      <form method="post" action="/api/action/{{ a.id }}/decide">
+        <input name="note" size="14" placeholder="note (stored)">
+        <button name="decision" value="approved">approve</button>
+        <button name="decision" value="rejected">reject</button>
+      </form>
+    {% elif a.status == 'pending' and a.policy_decision == 'REFUSED' %}
+      <span class="mini">nothing to approve — this class is refused, not gated</span>
+    {% else %}<span class="mini">closed</span>{% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="10" class="mini">No actions requested. Tier-1 actions are only created after an
+  INFEASIBLE proof, and the never-list (delete a submission, mark attendance, run a shell) cannot be
+  enabled by any setting.</td></tr>
+{% endfor %}
+</tbody></table>
+
+{% for a in drafts %}{% if a.payload and a.payload.get('body') %}
+<div class="panel" style="margin-top:12px">
+  <h3>What you are being asked to approve — #{{ a.id }} ({{ a.kind }})</h3>
+  <p class="mini">Rendered verbatim from <code>payload_json</code>. Approving does not send anything; it
+    reveals this text so you can paste it. If you disagree with a word, the fix is to correct the claim
+    it cites, not to edit the draft by hand — that keeps the draft and the ledger from diverging.</p>
+  <pre>To: {{ a.payload.to }}
+Subject: {{ a.payload.subject }}
+
+{% for line in a.payload.body %}{{ line }}
+{% endfor %}
+Citations:
+{{ a.payload.citations }}</pre>
+</div>
+{% endif %}{% endfor %}
+{% endblock %}

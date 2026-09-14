@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Twin{% endblock %}
+{% block body %}
+<h1>The twin</h1>
+<p class="sub">Every object here is a row with a receipt, not a summary a model wrote. The graph answers
+  "where did this fact come from, and what replaced it" — which is the question a dean asks, not
+  "what does the AI think".</p>
+<form class="inline" method="get">
+  <label class="mini">subject</label>
+  <select name="subject_id" onchange="this.form.submit()">
+    {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==sid }}>{{ s }}</option>{% endfor %}
+  </select>
+  <noscript><button>go</button></noscript>
+  <span class="mini">{{ subjects | length }} subject(s) with open claims</span>
+</form>
+
+{% if sid %}
+<div class="grid g2">
+  <div class="panel">
+    <h3>Lineage · {{ sid }}</h3>
+    {{ svg | safe }}
+    {% if not svg %}<p class="mini">No nodes for this subject yet.</p>{% endif %}
+    <div class="sep"></div>
+    <div class="row">
+      {{ pill(lin.nodes | length ~ ' node(s)') }} {{ pill(lin.edges | length ~ ' edge(s)') }}
+      {% if lin.graph_url %}<a href="{{ lin.graph_url }}" class="mini">raw graph view →</a>{% endif %}
+    </div>
+  </div>
+  <div class="panel">
+    <h3>What the twin currently believes</h3>
+    {% for c in claims %}
+      <div class="panel" style="background:var(--panel2);margin-bottom:7px">
+        <div class="row" style="justify-content:space-between">
+          <span><b>{{ c.predicate }}</b> = <code>{{ c.value | tojson }}</code></span>
+          <span>{{ badge('real_model_call' if (c.provenance or {}).llm_involved and (c.provenance or {}).validation_status == 'verified' else ('simulated' if (c.provenance or {}).llm_involved else 'rules_only')) }}</span>
+        </div>
+        <div class="mini" style="margin:4px 0">
+          {% set p = c.provenance or {} %}
+          source <b>{{ p.source_label or c.source_id }}</b> ({{ p.source_kind or '?' }}),
+          authority {{ p.authority or '—' }} ·
+          method <b>{{ c.method }}</b> · model {{ p.model or 'none (deterministic)' }} ·
+          ingested {{ p.ingested_at or p.created_at or '—' }}
+        </div>
+        <div class="quote">{{ c.evidence_span }}</div>
+        {% if c.valid_to %}<p class="mini">retired {{ c.valid_to }} → superseded by
+          claim <a href="/claims?q={{ c.subject_id }}">{{ c.superseded_by }}</a> (kept, never deleted)</p>{% endif %}
+      </div>
+    {% else %}<p class="mini">No grounded claims for this subject.</p>{% endfor %}
+  </div>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3>Why the graph is the product</h3>
+  <p class="mini" style="max-width:90ch">A flat list of "things the assistant knows" cannot be audited:
+    when one entry is wrong you cannot tell whether it was extracted, inferred, or pasted from a
+    rumour, and you cannot tell what else was planned against it. Here every edge is written at the
+    moment it happens — <code>supersedes</code> only exists if a higher-authority source contradicted a
+    lower one, and a weaker source that tried to overwrite an authoritative one becomes a conflict,
+    not a correction. That is why a wrong fact stays wrong for at most one human tap.</p>
+</div>
+{% else %}
+<p class="notice info">Nothing to draw yet: no source has been ingested into this database.</p>
+{% endif %}
+{% endblock %}

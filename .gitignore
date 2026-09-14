@@ -1,0 +1,23 @@
+# runtime state — the ledger is the product, so a copied database would fake a demo
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+data/
+uploads/
+
+# local secrets: .env.example is committed, .env is not
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/

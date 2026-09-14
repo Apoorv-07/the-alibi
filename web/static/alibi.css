@@ -1,0 +1,159 @@
+/* ALIBI — layer 2 of the design system.
+ *
+ * Layer 1 lives inline in `web/templates/base.html` and is the whole product on its own: a request that
+ * cannot load this file (offline, a hostile campus network, `curl`) renders identically apart from motion
+ * and the enhancements in alibi.js. That split is the point. A trust dashboard whose layout depends on a
+ * JS bundle is a dashboard that shows nothing exactly when something has gone wrong.
+ *
+ * So: no framework, no build, no fonts from a CDN, no chart library. Everything here is CSS that either
+ * deepens the surface, animates a state change, or styles a component the templates already emit.
+ */
+
+:root {
+  --r-sm: 6px; --r: 10px; --r-lg: 14px;
+  --e1: 0 1px 0 rgba(255,255,255,.025), 0 8px 24px -14px rgba(0,0,0,.85);
+  --e2: 0 1px 0 rgba(255,255,255,.04), 0 20px 44px -20px rgba(0,0,0,.9);
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --dur: .18s;
+  --glass: rgba(18,26,36,.72);
+}
+
+/* ---- ambient depth: one radial wash, no images, no requests ---------------- */
+body {
+  background:
+    radial-gradient(900px 480px at 78% -10%, rgba(107,184,255,.06), transparent 60%),
+    radial-gradient(700px 420px at 8% 110%, rgba(126,231,135,.05), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* ---- surfaces ------------------------------------------------------------- */
+.panel, .stat { border-radius: var(--r); box-shadow: var(--e1); transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.panel:hover { border-color: #27374a; }
+.stat { position: relative; overflow: hidden; }
+.stat::after {          /* the accent rail: a colour that means something, not decoration */
+  content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
+  background: linear-gradient(90deg, transparent, #26313f, transparent);
+}
+.stat.ok::after   { background: linear-gradient(90deg, transparent, #2f6b3f, transparent); }
+.stat.warn::after { background: linear-gradient(90deg, transparent, #7a5a1e, transparent); }
+.stat.bad::after  { background: linear-gradient(90deg, transparent, #7a2424, transparent); }
+.stat.info::after { background: linear-gradient(90deg, transparent, #1e4f7a, transparent); }
+
+/* number entry: the eye should land on the count first, everything else second */
+@keyframes rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.stat b, .stat u { animation: rise .34s var(--ease) both; }
+.stat u { animation-delay: .05s; }
+
+/* ---- nav ------------------------------------------------------------------ */
+nav a { border-radius: 0 var(--r-sm) var(--r-sm) 0; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+nav a i { min-width: 16px; text-align: center; border: 1px solid #3c2e14; background: #1a1409; border-radius: 99px; padding: 0 4px; }
+nav .syncing button { opacity: .6; pointer-events: none; }
+
+/* ---- tables: sticky head + row affordance + readable density -------------- */
+table { border-radius: var(--r-sm); }
+tbody tr { transition: background var(--dur) var(--ease); }
+tr:hover td { background: #121b26; }
+tr:focus-within td { background: #14202d; }
+td a { border-bottom: 1px solid transparent; }
+td a:hover { border-bottom-color: currentColor; text-decoration: none; }
+/* a table with no rows must not look like a bug */
+tbody tr[data-empty] td { color: var(--dim); font-style: italic; padding: 18px 8px; }
+
+/* ---- pills and badges ------------------------------------------------------ */
+.pill { transition: filter var(--dur) var(--ease); }
+.pill:hover { filter: brightness(1.16); }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+.p-live { animation: pulse 2.4s var(--ease) infinite; }
+@media (prefers-reduced-motion: reduce) { *, *::after, *::before { animation: none !important; transition: none !important; } }
+
+/* ---- buttons: the primary action is one, not four ------------------------- */
+button, input[type=submit] { border-radius: var(--r-sm); transition: background var(--dur) var(--ease), transform var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+button:hover, input[type=submit]:hover { border-color: #33506d; }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .5; cursor: progress; }
+button[data-variant=danger] { background: #1e1010; border-color: #462222; color: #ffb3b3; }
+button[data-variant=danger]:hover { background: #2a1414; border-color: #6a3030; }
+button[data-variant=go] { background: #10220f; border-color: #2c4a31; color: #b7e9c0; }
+:where(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+/* ---- forms ---------------------------------------------------------------- */
+input, select, textarea { transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
+input:hover, select:hover, textarea:hover { border-color: #2b3d51; }
+textarea:focus { background: #0d141d; }
+label { color: var(--dim); }
+
+/* ---- empty / error / loading states ---------------------------------------- */
+.empty { display: grid; gap: 8px; place-items: start; padding: 22px 16px; border: 1px dashed #24313f;
+  border-radius: var(--r); background: linear-gradient(180deg, rgba(255,255,255,.012), transparent); }
+.empty h3 { margin: 0; font-size: 13px; color: var(--ink); letter-spacing: 0; text-transform: none; }
+.empty p { margin: 0; color: var(--dim); font-size: 12px; max-width: 62ch; }
+.empty .row { margin-top: 4px; }
+
+.skeleton { background: #101821; border-radius: 4px; position: relative; overflow: hidden; min-height: 12px; }
+.skeleton::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, #1a2632, transparent); transform: translateX(-100%); }
+.js .skeleton::after { animation: sweep 1.25s linear infinite; }
+@keyframes sweep { to { transform: translateX(100%); } }
+
+/* ---- toast: feedback for the POSTs that currently answer with a JSON blob -- */
+.toast-layer { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 40;
+  max-width: min(420px, calc(100vw - 32px)); }
+.toast { background: var(--glass); backdrop-filter: blur(8px); border: 1px solid #2a3a4c; border-radius: var(--r);
+  box-shadow: var(--e2); padding: 9px 11px; font-size: 12px; color: var(--ink); display: grid; gap: 3px;
+  animation: toast-in .22s var(--ease) both; border-left-width: 3px; }
+.toast b { font-weight: 600; }
+.toast.ok    { border-left-color: var(--hi); }
+.toast.warn  { border-left-color: var(--warn); }
+.toast.bad   { border-left-color: var(--bad); }
+.toast.out   { animation: toast-out .2s var(--ease) both; }
+@keyframes toast-in  { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes toast-out { to   { opacity: 0; transform: translateY(6px) scale(.98); } }
+
+/* ---- command palette (progressive enhancement only) ----------------------- */
+.palette { position: fixed; inset: 0; z-index: 50; display: grid; place-items: start center;
+  background: rgba(4,7,11,.66); backdrop-filter: blur(3px); padding-top: 14vh; }
+.palette[hidden] { display: none; }
+.palette-box { width: min(560px, calc(100vw - 32px)); background: var(--panel); border: 1px solid #2a3d52;
+  border-radius: var(--r-lg); box-shadow: var(--e2); overflow: hidden; }
+.palette-box input { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  padding: 12px 14px; background: #0b1118; font-size: 14px; }
+.palette-box input:focus { outline: none; }
+.palette-list { list-style: none; margin: 0; padding: 6px; max-height: 46vh; overflow: auto; }
+.palette-list li { padding: 0; }
+.palette-list a { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: var(--r-sm); color: var(--ink); }
+.palette-list a:hover, .palette-list a[aria-current="true"] { background: #16212e; text-decoration: none; }
+.palette-list span { color: var(--dim); font-size: 11px; }
+.help dd { margin: 0 0 6px; color: var(--dim); font-size: 12px; }
+.help dt { color: var(--ink); font-size: 12px; margin-top: 8px; }
+
+/* ---- print: a receipt should survive being printed ------------------------ */
+@media print {
+  nav, .foot, form, button, .toast-layer { display: none !important; }
+  body { background: #fff; color: #111; }
+  .shell { display: block; }
+  .panel, .stat, pre, .quote { border-color: #bbb; box-shadow: none; background: #fff; color: #111; }
+  a { color: #111; }
+}
+
+/* ---- responsive: the nav collapses to a top bar, tables get their own axis  */
+@media (max-width: 880px) {
+  .shell { grid-template-columns: 1fr; }
+  nav { position: static; height: auto; display: flex; gap: 6px; overflow-x: auto; padding: 8px;
+        border-right: 0; border-bottom: 1px solid var(--line); align-items: center; }
+  nav .brand { border: 0; padding: 0 8px 0 0; flex: 0 0 auto; }
+  nav a { border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm); padding: 5px 9px; flex: 0 0 auto; }
+  nav a.on { border-bottom-color: var(--hi); background: #111a24; }
+  nav > div:last-child { margin: 0 0 0 auto; flex: 0 0 auto; padding: 0; border: 0; }
+  main { padding: 12px 12px 48px; }
+  h1 { font-size: 16px; }
+}
+@media (max-width: 640px) {
+  .g4, .g3, .g2 { grid-template-columns: 1fr; }
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  td.quote, .quote, pre { white-space: normal; word-break: break-word; }
+  .stat b { font-size: 22px; }
+  .toast-layer { right: 8px; left: 8px; bottom: 8px; max-width: none; }
+  /* tap targets: a 10px pill on a phone is not a control */
+  nav a, button, input[type=submit] { min-height: 30px; }
+}

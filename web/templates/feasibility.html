@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Feasibility{% endblock %}
+{% block body %}
+<h1>Feasibility</h1>
+<p class="sub">CP-SAT answers a question no LLM can: does <i>any</i> schedule exist that satisfies every
+  deadline, eligibility floor, release dependency and sleep cap you are under? When the answer is no, it
+  is a <b>proof</b>, not a forecast — and the unsat core says which facts are jointly impossible.</p>
+
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(tasks | length, 'tasks in horizon', 'only grounded due dates enter the model') }}
+  {{ stat(f.status or 'UNKNOWN', 'solver status', f.solves ~ ' solve(s) this run',
+           'bad' if f.status=='INFEASIBLE' else ('ok' if f.status=='FEASIBLE' else 'warn')) }}
+  {{ stat(f.slack_hours if f.slack_hours is not none else '—', 'min slack (h)', 'worst prefix of the horizon', 'warn' if (f.slack_hours or 0) < 0 else 'ok') }}
+  {{ stat(remedies | length, 'priced remedies', 'only relaxations the cited policy permits') }}
+</div>
+
+{% if f.status == 'INFEASIBLE' %}
+<div class="notice bad">
+  <b>PROVEN INFEASIBLE</b> — {{ f.head_line }}. This sentence contains no probability: the solver
+  exhausted the search under {{ f.core | length }} binding constraint(s).
+</div>
+{% elif f.status == 'UNKNOWN' %}
+<div class="notice info">{{ f.reason or 'the solver did not run' }}</div>
+{% endif %}
+
+<div class="grid g2" style="margin-top:10px">
+  <div class="panel">
+    <h3>Minimal unsat core</h3>
+    {% if f.core %}
+    <div class="row">{% for c in f.core %}{{ pill(c, 'p-bad') }}{% endfor %}</div>
+    <p class="mini" style="margin-top:8px">Each entry was found by deletion: the solver removed one
+      constraint at a time and re-ran; what remains is the smallest set that is still impossible.
+      Removing any single one of these makes the plan feasible again — that is what makes this a
+      <i>minimal</i> core, and it is why the remedy list below is short instead of speculative.</p>
+    <pre>{% for w in (f.why or []) %}{{ w }}
+{% endfor %}</pre>
+    {% else %}
+    <p class="mini">No core: the current facts fit inside the horizon{% if f.slack_hours is not none %}
+      with {{ f.slack_hours }}h of minimum slack{% endif %}. "Feasible" here means a schedule exists,
+      not that it is comfortable — see <a href="/risk">risk</a> for what erodes it.</p>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h3>Remedies, priced and ranked</h3>
+    <table><thead><tr><th>remedy</th><th>cost</th><th>fixes?</th><th>class</th><th>note</th></tr></thead>
+    <tbody>
+    {% for r in remedies %}
+      <tr><td><b>{{ r.kind }}</b><div class="mini">{{ r.title or r.task_id or '' }}</div></td>
+        <td class="num">{% if r.cost_pct is defined and r.cost_pct < 900 %}{{ r.cost_pct }}%{% else %}{{ r.cost or r.cost_pct or '—' }}{% endif %}</td>
+        <td>{{ pill('yes', 'p-hi') if r.makes_feasible else pill('no', 'p-bad') }}</td>
+        <td>{{ pill(r.cost_class or '', 'p-info' if r.cost_class=='policy_permitted' else 'p-warn') }}</td>
+        <td class="mini">{{ r.justification or r.cost or '' }}</td></tr>
+    {% else %}<tr><td colspan="5" class="mini">No remedies offered: either the plan is feasible, or no
+      relaxation the cited policy permits would help (then the honest answer is "reduce scope").</td></tr>
+    {% endfor %}</tbody></table>
+    <div class="sep"></div>
+    <div class="row">
+      {% if tasks %}
+      <form class="inline" method="get" action="/api/plan/draft-extension">
+        <select name="task">{% for t in tasks %}<option>{{ t.id }}</option>{% endfor %}</select>
+        <input name="remedy_days" value="1" size="2">
+        <button>draft the request (needs your approval)</button>
+      </form>
+      {% endif %}
+    </div>
+    <p class="mini">The draft cites only ledger rows and quotes them; the app never sends it. If the
+      ledger has no late policy on record, the draft says so instead of inventing one.</p>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3>Inputs the proof was computed from</h3>
+  <table><thead><tr><th>task</th><th>due</th><th class="num">minutes</th><th class="num">weight</th>
+    <th>released</th><th>requires</th></tr></thead><tbody>
+  {% for t in tasks %}
+    <tr><td><a href="/lineage?subject_id={{ t.id }}">{{ t.id }}</a></td><td>{{ t.due }}</td>
+      <td class="num">{{ t.minutes }}</td><td class="num">{{ (t.weight * 100) | round(0) }}%</td>
+      <td>{{ t.released or '—' }}</td><td class="mini">{{ t.requires | join(', ') or '—' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="mini">No task carries a grounded due date, so there is nothing to
+    prove infeasible. That is reported as UNKNOWN, never as "fine".</td></tr>{% endfor %}
+  </tbody></table>
+  {% if prefix %}
+  <details><summary class="mini">per-prefix capacity analysis ({{ prefix | length }} rows)</summary>
+    <pre>{{ prefix | tojson(indent=1) }}</pre></details>
+  {% endif %}
+</div>
+{% endblock %}

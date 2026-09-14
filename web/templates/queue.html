@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Review queue{% endblock %}
+{% block body %}
+<h1>Review queue</h1>
+<p class="sub">Signature behaviour: anything the system cannot ground, or cannot promote without a human,
+  arrives here with its evidence inline and its options priced. Nothing in this list is silently
+  guessed, and nothing leaves it without a recorded consequence.</p>
+
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(rows | length, 'open', 'each deduped by (kind, subject, question)', 'warn' if rows else 'ok') }}
+  {{ stat(stats.claims_review, 'claims in review', 'not in the live plan, not deleted') }}
+  {{ stat(stats.injections_quarantined, 'quarantined payloads', 'instruction-shaped text', 'info') }}
+  {{ stat(resolved | length, 'answered', 'with consequence recorded', 'ok') }}
+</div>
+
+{% for r in rows %}
+<div class="panel" style="margin-bottom:12px">
+  <div class="row" style="justify-content:space-between">
+    <h3 style="margin:0">{{ r.question }}</h3>
+    {{ pill(r.kind, 'p-warn') }} {{ pill(r.subject_id or r.subject_type, 'p-info') }}
+  </div>
+  {% if r.why %}<p class="mini">{{ r.why }}</p>{% endif %}
+  <div class="grid g2" style="margin-top:8px">
+    <div>
+      <h3>Options, with what each one costs</h3>
+      {% set opts = r.options_json if r.options_json is string else (r.options or []) %}
+      {% if opts %}
+      <table><tbody>
+        {% for o in opts %}
+        <tr><td><label><input type="radio" name="chosen" value="{{ o | tojson if o is not string else o }}"
+                 form="rev{{ r.id }}" {{ 'checked' if o.chosen }}>
+          <code>{{ (o.label or o) if o is not string else o }}</code></label>
+          {% if o is not string and o.consequence %}<div class="mini">{{ o.consequence }}</div>{% endif %}</td></tr>
+        {% endfor %}
+      </tbody></table>
+      {% else %}
+      <p class="mini">No candidate set — the answer is yours to type below, and it becomes the source of
+        truth for this field (a human decision is the highest authority tier in the policy).</p>
+      {% endif %}
+      <h3>Evidence, so you do not have to go look</h3>
+      <div class="scroll">
+      {% for e in (r.evidence or []) %}
+        <div class="quote" style="margin-bottom:5px">{{ e.source }}{% if e.authority is defined %}
+          · authority {{ '%.2f' | format(e.authority) }}{% endif %}
+          {{" · " ~ e.quote if e.quote else ""}}</div>
+      {% else %}<p class="mini">No structured evidence attached; see the claim link below.</p>{% endfor %}
+      </div>
+    </div>
+    <div>
+      <h3>Your answer</h3>
+      <form id="rev{{ r.id }}" method="post" action="/api/review/{{ r.id }}/resolve">
+        <textarea name="chosen" rows="2" cols="46"
+          placeholder="your answer — with 'use my answer', this becomes a claim (method=manual), so write the sentence you are relying on"></textarea>
+        <div class="row" style="gap:8px;align-items:center;margin-top:4px">
+          <label class="mini" for="pred{{ r.id }}">your answer states the</label>
+          <select id="pred{{ r.id }}" name="predicate">
+            {% for opt in ["due_at", "weight", "late_policy", "submitted", "submission_channel", "venue"] %}
+            <option value="{{ opt }}"{% if opt == "due_at" %} selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+          <span class="mini">a date answer is stored only if your sentence names exactly one date with a
+            year; two dates means we ask again instead of guessing.</span>
+        </div>
+        <textarea name="note" rows="2" cols="46"
+          placeholder="why — this is stored as the consequence, not thrown away"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button name="decision" value="accept_safety">accept safest (earliest date)</button>
+          <button name="decision" value="keep_own">use my answer</button>
+          <button name="decision" value="dismiss">dismiss, keep unverified</button>
+        </div>
+      </form>
+      <p class="mini" style="margin-top:8px">Dismissing does not delete the claim: it stays
+        <code>verify_state='review'</code> and is excluded from the plan, which is a visible state in the
+        header, not a hidden one.</p>
+      {% if r.claim_id %}<a href="/claims?q={{ r.subject_id }}#c{{ r.claim_id }}">view claim
+        {{ r.claim_id }} →</a>{% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="notice">Queue is empty. The honest reading: every open claim's receipt re-verifies right now.
+  It is not "the system never needs help" — with no sources ingested it also has nothing to say.</div>
+{% endfor %}
+
+{% if resolved %}
+<h2>Recently answered</h2>
+<table><thead><tr><th>when</th><th>kind</th><th>subject</th><th>decision</th><th>consequence</th>
+  <th>by</th></tr></thead><tbody>
+{% for r in resolved %}
+<tr><td class="mini">{{ r.resolved_at or r.created_at }}</td><td>{{ pill(r.kind) }}</td>
+  <td>{{ r.subject_id }}</td><td><code>{{ r.resolution }}</code></td>
+  <td class="mini">{{ r.consequence }}</td><td class="mini">{{ r.resolved_by }}</td></tr>
+{% endfor %}</tbody></table>
+{% endif %}
+{% endblock %}

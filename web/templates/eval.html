@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Evaluation{% endblock %}
+{% block body %}
+<h1>Evaluation</h1>
+<p class="sub">Nothing on this page is typed in by hand. Every number is read out of
+  <code>EVAL_REPORT.json</code>, written by <code>python3 evaluation/harness.py</code> running on
+  <i>this</i> repository — the same ingest, verifier, reconciler and solver the UI uses. The page renders
+  the file instead of restating it, so it cannot drift from the harness and cannot flatter the product.</p>
+
+{% if not has_report %}
+<div class="notice bad">No <code>EVAL_REPORT.json</code> on disk. Run <code>python3
+  evaluation/harness.py</code>. Until that file exists this page shows nothing rather than showing
+  numbers from memory — a dashboard that can display an unbacked figure is the failure mode this whole
+  project is about.</div>
+{% else %}
+
+{% set o = (report.variants or {}).get('oracle') or {} %}
+{% set n = (report.variants or {}).get('naive_attribution') or {} %}
+{% set r = (report.variants or {}).get('rules_only') or {} %}
+{% set ours = report.ours or {} %}
+{% set inj = report.injection or {} %}
+{% set base = report.baseline_naive_transcription or {} %}
+{% set cor = report.corpus or {} %}
+
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(o.claims_emitted or '—', 'claims emitted', 'gold path, on ' ~ (cor.blocks or '?') ~ ' corpus blocks') }}
+  {{ stat(((o.verifier_pass_rate or 0) * 100) | round(1) ~ '%', 'verifier pass rate',
+          'quotes re-found in their own source byte-for-byte', 'ok') }}
+  {{ stat((o.reconciled_correct or 0) ~ '/' ~ (o.reconciled_total or 0), 'attributions reconciled',
+          'date → the right obligation', 'ok') }}
+  {{ stat((o.conflicts_detected or 0) ~ '/' ~ (o.conflicts_planted or 0), 'planted conflicts found',
+          'disagreement kept on file, not deleted', 'ok') }}
+</div>
+
+<div class="notice">
+  <b>These rows contain zero model calls.</b> {{ report.model_note or
+  'The oracle variant is a scripted extractor standing in for a model; it proves the ledger, verifier,
+  reconciler and solver work — it does not prove that a model is accurate.' }}
+  <div class="mini" style="margin-top:4px">Report generated {{ mtime }} · harness on the shipped code
+  path, not a re-implementation of it.</div>
+</div>
+
+<h2>Variants — what each shortcut costs</h2>
+<table>
+<thead><tr><th>variant</th><th class="num">claims</th><th class="num">grounded</th>
+  <th class="num">verifier pass</th><th class="num">reconciled</th><th class="num">conflicts</th>
+  <th class="num">gold dates right</th><th>what it actually is</th></tr></thead>
+<tbody>
+{% for name, v in ((report.variants or {}) | dictsort) %}
+<tr>
+  <td><b>{{ name }}</b></td>
+  <td class="num">{{ v.claims_emitted }}</td>
+  <td class="num">{{ v.grounded }}/{{ v.claims_emitted }}</td>
+  <td class="num">{{ (v.verifier_pass_rate * 100) | round(1) }}%</td>
+  <td class="num">{{ v.reconciled_correct }}/{{ v.reconciled_total }}</td>
+  <td class="num">{{ v.conflicts_detected }}/{{ v.conflicts_planted }}</td>
+  <td class="num">{{ (v.gold_date_present * 100) | round(1) }}%</td>
+  <td class="mini">
+    {% if name == 'oracle' %}deterministic attribution + verification, extraction scripted
+    {% elif name == 'naive_attribution' %}every date in the document is pinned to <i>every</i> task in
+      it — each claim is still verbatim-grounded, which is why the verifier passes and the plan is still
+      wrong
+    {% elif name == 'rules_only' %}regex extraction, no model: the offline floor
+    {% else %}{{ name }}{% endif %}
+    {% if v.missed_tasks %} · missed: {{ (v.missed_tasks or []) | join(', ') }}{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</tbody></table>
+<p class="mini">Read the middle two columns together. Naive attribution scores 25/25 grounded and
+  {{ (n.gold_date_present * 100) | round(1) }}% correct dates — a perfect verifier pass rate and a corrupt
+  ledger. That is the whole argument for verification <i>and</i> attribution being separate, tested
+  properties: "every fact has a quote" is necessary and nowhere near sufficient.</p>
+
+<div class="grid g2" style="margin-top:12px">
+  <div class="panel">
+    <h3>Feasibility — {{ ours.flagged }}/{{ ours.overloads }} planted overloads proven impossible</h3>
+    <table>
+    <thead><tr><th>case</th><th>status</th><th class="num">shortfall</th><th class="num">core lines</th>
+      <th class="num">remedies</th><th class="num">that work</th><th>blocked by</th></tr></thead>
+    <tbody>
+    {% for cs in ours.cases or [] %}
+      <tr><td>{{ cs.case }}</td><td>{{ badge('INFEASIBLE' if cs.status == 'INFEASIBLE' else cs.status,
+        'bad' if cs.status == 'INFEASIBLE' else 'ok') }}</td>
+        <td class="num">{{ cs.shortfall_h }}h</td><td class="num">{{ cs.core_lines }}</td>
+        <td class="num">{{ cs.remedies }}</td>
+        <td class="num {% if not cs.remedies_that_work %}warn{% endif %}">{{ cs.remedies_that_work }}</td>
+        <td class="mini">{% if cs.safety_binding %}the waivable safety rules, not the volume of work{%
+          elif cs.feasible_if_safety_relaxed %}relaxing safety fixes it{% else %}raw capacity{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody></table>
+    <p class="mini">{{ ours.fixable_by_one_lever }}/{{ ours.overloads }} are fixed by exactly one cited
+      lever; {{ ours.honestly_unfixable }} have no remedy and say "reduce scope" instead of inventing one.
+      The control week (deadlines and capacity only) is feasible in every case, which is what makes the
+      shortfalls attributable to the safety constraints rather than to the arithmetic being hard.</p>
+  </div>
+
+  <div class="panel">
+    <h3>Injection resistance — {{ inj.rows | length }} payloads,
+      {{ (inj.rows or []) | selectattr('promoted') | list | length }} promoted</h3>
+    <table>
+    <thead><tr><th>case</th><th>outcome</th><th>as expected</th></tr></thead>
+    <tbody>
+    {% for row in inj.rows or [] %}
+      <tr><td class="mini">{{ row.case }}</td>
+          <td>{{ badge(row.reason or ('promoted' if row.promoted else 'refused'),
+                       'ok' if row.as_expected else 'bad') }}</td>
+          <td>{% if row.as_expected %}yes{% else %}<b class="warn">NO</b>{% endif %}
+              {% if row.promoted %}· became state{% else %}· never became state{% endif %}</td></tr>
+    {% endfor %}
+    </tbody></table>
+    <p class="mini">The first row is the control: a legitimate claim from the same hostile-looking source
+      must still get through, or "security" is just a broken pipeline. The number that matters is
+      <b>promoted</b>, not "blocked N of M" — a screen that refuses everything scores perfectly on the
+      latter.</p>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3>Against the "just ask ChatGPT" baseline</h3>
+  <p class="mini">The honest version of this comparison is uncomfortable: on <i>this</i> corpus a
+    deterministic transcription of a hand-written plan flags {{ base.flagged_broken }}/{{ base.plans }}
+    broken weeks and detects {{ base.detected_infeasible }} infeasible cases too, so "the baseline cannot
+    compute" is false and is not claimed anywhere in this repo. What it does not have is recorded below.</p>
+  <div class="grid g3">
+    {{ stat(base.plans, 'plans checked by the baseline', 'typed in by hand — the input problem', 'info') }}
+    {{ stat(base.gold_plan_correct or 'not measured', 'baseline plan correctness',
+             'it has no ledger to be wrong or right about', 'warn') }}
+    {{ stat(cor.gold_tasks, 'obligations in the corpus', 'the part a chat window still has to read out loud', 'info') }}
+  </div>
+  <p class="mini" style="margin-top:8px">The baseline is an answer to "is this schedule over my head
+    tonight". ALIBI is an answer to "what changed, which source said so, is that source allowed to win, and
+    what may I do about it" — <code>gold_plan_correct: None</code> is printed rather than guessed because
+    the harness could not evaluate that row here, and a blank cell is the correct output for a measurement
+    that did not happen.</p>
+</div>
+
+<h2>Provenance of every number above</h2>
+<div class="panel">
+{% for k, v in (report.provenance or {}) | dictsort %}
+  <p class="mini"><b>{{ k }}</b> — {{ v }}</p>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

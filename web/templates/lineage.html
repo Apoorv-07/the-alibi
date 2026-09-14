@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Lineage{% endblock %}
+{% block body %}
+<h1>Claim lineage</h1>
+<p class="sub">"Show me why you believe this", answered with rows. Source → observation → claim →
+  supersession → change → plan, in one table, with the engine that produced each claim labelled.</p>
+<form class="inline" method="get">
+  <label class="mini">subject</label>
+  <select name="subject_id" onchange="this.form.submit()">
+    {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==sid }}>{{ s }}</option>{% endfor %}
+  </select>
+  <span class="mini">{{ graph.claim_ids | length }} claim(s), {{ graph.edges | length }} edge(s)</span>
+</form>
+
+<table>
+<thead><tr><th>claim</th><th>predicate</th><th>value</th><th>state</th><th>engine</th><th>authority</th>
+  <th>checks the verifier ran</th><th>quote</th><th>lineage</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr>
+  <td class="num">#{{ r.id }}</td>
+  <td>{{ r.predicate }}<div class="mini">{{ r.verify_state }} · {{ r.method }}</div></td>
+  <td><code>{{ r.value_json }}</code></td>
+  <td>{% if r.verify_state == 'grounded' %}{{ pill('grounded', 'p-hi') }}{% else %}{{ pill(r.verify_state, 'p-warn') }}{% endif %}
+    <div class="mini">{{ r.validation_status or '—' }}</div></td>
+  <td>{% if r.llm_involved and r.model and r.model != 'regex-extractor-v1' %}{{ badge('real_model_call') }}
+      {% elif r.llm_involved %}{{ badge('simulated') }}
+      {% else %}{{ badge('rules_only') }}{% endif %}
+      <div class="mini">{{ r.provider or 'rules' }}{% if r.model %} / {{ r.model }}{% endif %}</div></td>
+  <td class="num">{{ '%.2f' | format(r.authority) if r.authority is not none else '—' }}</td>
+  <td class="mini">{% if r.checks_passed %}<span style="color:var(--hi)">✓</span> {{ r.checks_passed }}
+    {% else %}no checks recorded{% endif %}</td>
+  <td style="max-width:40ch"><div class="quote">{{ (r.evidence_span or '')[:220] }}</div></td>
+  <td class="mini">{% for e in graph.edges %}{% if e['from'] == r.id or e.to == r.id %}
+    {{ e.kind }} → <a href="#c{{ e.to if e['from']==r.id else e['from'] }}">
+    {{ e.to if e['from']==r.id else e['from'] }}</a><br>{% endif %}{% endfor %}</td>
+</tr>
+{% else %}
+<tr><td colspan="9" class="mini">No claims for this subject.</td></tr>
+{% endfor %}
+</tbody></table>
+
+<div class="panel" style="margin-top:12px">
+  <h3>Edges on this subject</h3>
+  <table><thead><tr><th>from</th><th>edge</th><th>to</th><th>why</th></tr></thead><tbody>
+  {% for e in graph.edges %}
+    <tr><td class="num">#{{ e['from'] }}</td><td>{{ pill(e.kind, 'p-vio') }}</td>
+      <td class="num">#{{ e.to }}</td><td class="mini">{{ e.why or '—' }}</td></tr>
+  {% else %}<tr><td colspan="4" class="mini">No supersession or dependency edges — nothing has
+    contradicted anything else here.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3>Changes touching this subject</h3>
+  <table><thead><tr><th>when</th><th>kind</th><th>old → new</th><th>effect</th><th>severity</th></tr></thead>
+  <tbody>{% for c in graph.changes %}
+    <tr><td class="mini">{{ c.ts }}</td><td>{{ c.kind }}</td>
+      <td><code>{{ c.old_value or '∅' }}</code> → <code>{{ c.new_value or '∅' }}</code></td>
+      <td class="mini">{{ c.effect }} {{ c.why }}</td><td>{{ pill(c.severity) }}</td></tr>
+  {% else %}<tr><td colspan="5" class="mini">No change events for this subject.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

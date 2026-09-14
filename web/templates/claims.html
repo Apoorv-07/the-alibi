@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Claims{% endblock %}
+{% block body %}
+<h1>Claims</h1>
+<p class="sub">Every fact the twin holds, with the verbatim span that justifies it. A claim whose quote
+  cannot be found in its own source is not a claim — and the header counts exactly those.</p>
+<form class="inline" method="get">
+  <input name="q" value="{{ q }}" placeholder="subject, predicate or quoted text" size="34"
+         data-live-filter="#claimtable" aria-label="filter these rows as you type">
+  <select name="state">
+    {% for s in ('open','history','all') %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}
+  </select>
+  <button>filter</button>
+  <span class="mini">{{ rows | length }} row(s)</span>
+</form>
+
+<table id="claimtable">
+<thead><tr><th>#</th><th>subject / predicate</th><th>value</th><th>state</th><th>method</th>
+  <th>provenance</th><th>verbatim evidence</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr id="c{{ r.id }}">
+  <td class="num">{{ r.id }}{% if r.valid_to %}<div class="mini">retired</div>{% endif %}</td>
+  <td><a href="/lineage?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a>
+      <div class="mini">{{ r.predicate }} · {{ r.subject_type }}</div></td>
+  <td><code>{{ r.value_json }}</code></td>
+  <td>{{ pill(r.verify_state, 'p-hi' if r.verify_state=='grounded' else ('p-warn' if r.verify_state=='grounded_relative_ambiguous' else 'p-bad')) }}</td>
+  <td>{{ pill(r.method, 'p-info' if 'llm' in r.method else '') }}</td>
+  <td class="mini">
+    {{ badge('real_model_call' if r.llm_involved and r.model else ('simulated' if r.llm_involved else 'rules_only')) }}
+    <div style="margin-top:3px">src <b>{{ r.source_label or ('#' ~ r.source_id) }}</b>
+      ({{ r.orig_kind or '?' }}) · auth {{ r.authority if r.authority is defined else '—' }}</div>
+    <div>{{ r.provider or 'rules' }}{% if r.model %} / {{ r.model }}{% endif %} ·
+      {{ r.validation_status or '—' }}</div>
+    {% if r.checks_passed %}<div class="mini" style="color:#7ee787">✓ {{ r.checks_passed }}</div>{% endif %}
+  </td>
+  <td style="max-width:44ch"><div class="quote">{{ r.evidence_span[:400] }}</div>
+    <div class="mini">offset {{ r.char_start }}–{{ r.char_end }}
+      {% if r.char_start < 0 %}(not located exactly — the span is quoted but not anchored){% endif %}
+      · <a href="/api/claims/{{ r.id }}/evidence">json</a></div></td>
+</tr>
+{% else %}
+<tr data-empty="1"><td colspan="7" class="mini">No rows. That is a filter, not a verdict.</td></tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

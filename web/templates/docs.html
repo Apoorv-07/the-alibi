@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Docs{% endblock %}
+{% block body %}
+<h1>Docs</h1>
+<p class="sub">Served from the repository, so the running demo and the written claims cannot drift apart.
+  If a doc describes something that does not exist, deleting the doc is the fix.</p>
+<div class="panel">
+{% for d in docs %}
+  <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+    <a href="/api/doc/{{ d.name }}"><b>{{ d.name }}</b></a>
+    <span class="mini">{{ d.path }}</span>
+  </div>
+{% else %}<p class="mini">No docs found.</p>{% endfor %}
+</div>
+<div class="grid g2" style="margin-top:12px">
+<div class="panel"><h3>The one-paragraph version</h3>
+  <p class="mini">Alibi reads the documents a student actually has — syllabus PDFs, a WhatsApp export, a
+  photographed notice board, an ERP screen, an ICS feed — and turns them into an evidence-backed ledger of
+  commitments. A model reads and drafts; deterministic code verifies, computes, decides and remembers.
+  Every claim carries the verbatim span that justifies it, so the system can answer "why do you believe
+  this" and can prove that nothing unverified ever became trusted state.</p></div>
+<div class="panel"><h3>What is NOT here</h3>
+  <p class="mini">No multi-agent theatre, no fine-tuning, no blockchain notary, no RAG chatbot, no
+  "AI plans your week". Each would be decoration on a system whose only defensible claim is that its
+  numbers are checkable. Where an LLM is used, it is because the task is language; where it is not,
+  it is absent, and the UI says which engine produced each row.</p></div>
+</div>
+{% endblock %}

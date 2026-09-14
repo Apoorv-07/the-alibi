@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Alibi{% endblock %} — academic twin</title>
+{# Layer 1: everything needed to render *correctly* is inline below, because the demo may run on a college
+   network where any external asset — this one is local, but the failure mode is the same — is a coin flip.
+   Layer 2 (alibi.css, alibi.js) adds depth, motion, toasts and a palette; both are served from /static in
+   this very process, never a CDN, and if they fail to load the page is identical apart from the effects. #}
+{% if has_static %}<link rel="stylesheet" href="/static/alibi.css?v={{ built_at }}">{% endif %}
+<style>
+:root{
+  --bg:#080b10; --panel:#0e141c; --panel2:#121a24; --line:#1e2937; --ink:#dbe6f2; --dim:#7d8ea3;
+  --hi:#7ee787; --warn:#ffb454; --bad:#ff6b6b; --info:#6bb8ff; --vio:#c39cff; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 var(--mono)}
+a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+.shell{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+nav{border-right:1px solid var(--line);background:linear-gradient(180deg,#0a0e14,#0b1016);padding:14px 0;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{padding:0 14px 12px;border-bottom:1px solid var(--line)}
+.brand b{display:block;font-size:15px;letter-spacing:.14em;color:#fff}
+.brand span{font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+nav a{display:flex;justify-content:space-between;gap:8px;padding:6px 14px;color:var(--dim);font-size:12px;border-left:2px solid transparent}
+nav a:hover{background:#0f151d;color:var(--ink);text-decoration:none}
+nav a.on{color:#fff;background:#111a24;border-left-color:var(--hi)}
+nav a i{font-style:normal;color:var(--warn)}
+main{padding:16px 20px 60px;min-width:0}
+h1{font-size:17px;margin:0 0 2px;letter-spacing:.02em}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin:22px 0 8px}
+.sub{color:var(--dim);font-size:12px;margin:0 0 14px;max-width:78ch}
+.grid{display:grid;gap:10px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.panel h3{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 12px}
+.stat b{display:block;font-size:26px;line-height:1.05;font-weight:600}
+.stat u{display:block;text-decoration:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:5px}
+.stat small{color:var(--dim);font-size:11px}
+.ok b{color:var(--hi)} .warn b{color:var(--warn)} .bad b{color:var(--bad)} .info b{color:var(--info)}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;letter-spacing:.06em;
+  border:1px solid var(--line);background:#0c1218;color:var(--dim);white-space:nowrap}
+.p-hi{color:var(--hi);border-color:#1c3b28;background:#0d1a12}
+.p-warn{color:var(--warn);border-color:#3c2e14;background:#1a1409}
+.p-bad{color:var(--bad);border-color:#3d1c1c;background:#1a0d0d}
+.p-info{color:var(--info);border-color:#16304d;background:#0b1522}
+.p-vio{color:var(--vio);border-color:#2b2340;background:#120f1c}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line);padding:6px 8px;position:sticky;top:0;background:var(--panel)}
+td{border-bottom:1px solid #141c26;padding:6px 8px;vertical-align:top}
+tr:hover td{background:#101822}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.quote{background:#0a1017;border-left:2px solid var(--hi);padding:6px 9px;color:#a8c5a8;
+  font-size:12px;white-space:pre-wrap;word-break:break-word;border-radius:0 5px 5px 0}
+.quote.none{border-left-color:var(--warn);color:#c9b48a}
+pre{margin:0;background:#0a1017;border:1px solid var(--line);border-radius:6px;padding:9px;
+  overflow:auto;font-size:11.5px;white-space:pre-wrap;word-break:break-word}
+form.inline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+input,select,textarea,button{font:inherit;color:var(--ink);background:#0b1118;border:1px solid var(--line);
+  border-radius:6px;padding:5px 8px}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--info)}
+button,input[type=submit]{cursor:pointer;background:#16212e;border-color:#25384d;color:#fff}
+button:hover{background:#1c2a3a}
+.possess{color:var(--dim)}
+.bar{height:7px;background:#0b1118;border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#2c6b3f,#7ee787)}
+.bar.warn>i{background:linear-gradient(90deg,#7a5a1e,#ffb454)}
+.bar.bad>i{background:linear-gradient(90deg,#7a2424,#ff6b6b)}
+.edge{fill:none;stroke:#31465c;stroke-width:1.4;marker-end:url(#arr)}
+.elab{fill:#7d8ea3;font-size:9px;font-family:var(--mono);text-anchor:middle}
+.node rect{fill:#131d28;stroke:#2a3d52}
+.node.src rect{fill:#141f16;stroke:#2c4a31} .node.task rect{fill:#1a1626;stroke:#3a2f55}
+.node text{fill:#cfe0f2;font-size:11px;font-family:var(--mono)}
+.foot{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);color:#556575;font-size:11px}
+.foot b{color:var(--dim);font-weight:400}
+.notice{border:1px solid #2b3a20;background:#111a0f;color:#c8e6b0;padding:8px 10px;border-radius:6px;font-size:12px}
+.notice.bad{border-color:#3d2020;background:#180e0e;color:#f0bcbc}
+.notice.info{border-color:#1e3348;background:#0c1520;color:#b9d6f2}
+kbd{background:#121a24;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sep{height:1px;background:var(--line);margin:10px 0}
+.mini{font-size:11px;color:var(--dim)}
+.scroll{max-height:340px;overflow:auto}
+code{background:#0f161f;border-radius:3px;padding:0 4px;color:#a8c5e8;font-size:11.5px}
+details{border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:#0c1218;margin:6px 0}
+summary{cursor:pointer;color:var(--ink);font-size:12px}
+.badge{font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:1px 5px;border-radius:3px;border:1px solid}
+.b-real{color:#9fe3ad;border-color:#274a2f;background:#101a12}
+.b-sim{color:#ffd479;border-color:#4a3c18;background:#1a1509}
+.b-oracle{color:#c39cff;border-color:#332a4a;background:#130f1e}
+.b-none{color:#8fa3b8;border-color:#2a3a4c;background:#0d151e}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+<nav>
+  <div class="brand"><b>ALIBI</b><span>proof before promotion</span></div>
+  {% for key,label,href in nav %}<a class="{{ 'on' if key==active }}" href="{{ href }}">{{ label }}
+    {% if key=='queue' and c_reviews_open %}<i>{{ c_reviews_open }}</i>{% endif %}
+    {% if key=='conflicts' and c_conflicts %}<i>{{ c_conflicts }}</i>{% endif %}
+    {% if key=='actions' and c_actions %}<i>{{ c_actions }}</i>{% endif %}
+  </a>{% endfor %}
+  <div style="padding:12px 14px;border-top:1px solid var(--line);margin-top:10px">
+    <form method="post" action="/api/sync"><input type="hidden" name="demo" value="true">
+      <button style="width:100%">⟳ sync now</button></form>
+    <div class="mini" style="margin-top:8px">mode <b>{{ c_mode or '—' }}</b><br>
+      local <b>{{ c_local or 'none' }}</b><br>cloud <b>{{ c_cloud or 'off' }}</b></div>
+  </div>
+</nav>
+<main>
+{% block body %}{% endblock %}
+<div class="foot">
+  <div class="row" style="justify-content:space-between">
+    <span>rendered in <b>{{RENDER_MS}} ms</b> on the server · built {{ built_at }} ·
+      no model call is on this request path</span>
+    <span><a href="/api/export/ledger.json">ledger.json</a> ·
+      <a href="/api/export/ledger.csv">ledger.csv</a> · <a href="/api/export/twin.ics">twin.ics</a> ·
+      <a href="/metrics">metrics</a> · <a href="/api/docs">API</a></span>
+  </div>
+  <div class="mini" style="margin-top:4px">Every number on every page is a COUNT or SUM over rows in
+    SQLite. Numbers that came from a model are labelled; numbers that came from a deterministic
+    oracle are labelled too. Nothing here is a mock.</div>
+</div>
+</main>
+</div>
+{% if has_static %}<script src="/static/alibi.js?v={{ built_at }}" defer></script>{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

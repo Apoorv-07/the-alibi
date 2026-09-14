@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Data routing{% endblock %}
+{% block body %}
+<h1>Data routing</h1>
+<p class="sub">Privacy as an observable state, not a promise: what left this machine, in what shape, under
+  which policy, and what would be sent on the next sync. Every number below is read from
+  <code>model_invocation</code> — if a request had been refused, there is a row saying so.</p>
+
+<div class="grid g4" style="margin-bottom:12px">
+  {{ stat(stats.local_calls, 'LOCAL calls', 'nothing crossed a socket', 'ok') }}
+  {{ stat(stats.cloud_calls, 'CLOUD calls', 'redacted, capped by budget', 'warn' if stats.cloud_calls else 'ok') }}
+  {{ stat(stats.cloud_bytes, 'bytes egressed', 'sum(bytes_out) over cloud rows', 'warn' if stats.cloud_bytes else 'ok') }}
+  {{ stat(stats.llm_involved_claims, 'claims touched by a model', stats.claims_verified ~ ' grounded in total', 'info') }}
+</div>
+
+<div class="grid g2">
+  <div class="panel">
+    <h3>Where each claim's text went</h3>
+    <table><thead><tr><th>method</th><th class="num">claims</th><th class="num">model involved</th>
+      <th>route</th></tr></thead><tbody>
+    {% for r in claims_by_route %}
+      <tr><td><b>{{ r.method }}</b></td><td class="num">{{ r.n }}</td><td class="num">{{ r.llm or 0 }}</td>
+        <td>{% if r.llm %}{{ pill('CLOUD only if routed + redacted', 'p-warn') }}
+            {% else %}{{ pill('LOCAL only', 'p-hi') }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4" class="mini">no claims yet</td></tr>{% endfor %}
+    </tbody></table>
+    <div class="sep"></div>
+    <h3>Per provider / per egress class</h3>
+    <table><thead><tr><th>provider</th><th>model</th><th>egress</th><th class="num">calls</th>
+      <th class="num">bytes in</th><th class="num">bytes out</th><th class="num">est $</th></tr></thead>
+    <tbody>
+    {% for e in egress %}
+      <tr><td>{{ e.provider }}</td><td class="mini">{{ e.model }}</td>
+        <td>{{ pill(e.egress, 'p-hi' if e.egress=='LOCAL' else ('p-warn' if e.egress=='REDACTED_CLOUD' else 'p-bad' if e.egress=='CLOUD' else '')) }}</td>
+        <td class="num">{{ e.n }}</td><td class="num">{{ e.bi }}</td><td class="num">{{ e.bo }}</td>
+        <td class="num">{{ '%.4f' | format(e.cost) }}</td></tr>
+    {% else %}<tr><td colspan="7" class="mini">No model call has been made on this database.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  <div class="panel">
+    <h3>Policy in force</h3>
+    <pre>mode                     {{ prov.mode }}
+local provider           {{ prov.local.provider or '—' }} / {{ prov.local.model or '—' }}
+local available          {{ prov.local.available }}
+cloud enabled by config  {{ cfg.cloud_escalation_enabled }}
+cloud available          {{ prov.cloud.available }}   ({{ prov.cloud.reason or 'key present' }})
+max cloud bytes / day    {{ policy.max_bytes_per_day }}
+redacted fields          {{ policy.redacted_fields | join(', ') }}
+max quote chars sent     {{ policy.max_quote_chars }}
+raw text retention         {{ raw_retention }} days (then unverifiable, reported as such)</pre>
+    <h3>Redaction rules, applied before egress</h3>
+    <pre>{# shown as a policy table so a reviewer can check them against the code, not the copy #}
+name              → [PERSON]        (from institution config)
+email             → [EMAIL]
+phone / +91…      → [PHONE]
+digits ≥6         → [ID]            (roll no., ERP id, receipt no.)
+alphanumeric id   → [ID]            (21CSE0417, CH2110047)
+url               → [URL]
+per-claim fields: {{ policy.redacted_fields | join(', ') }}
+dates, weights, course codes: KEPT — they are the payload</pre>
+    <p class="mini">The mask is asymmetric on purpose: it removes identifiers and keeps the numbers that
+      make the question answerable. A redactor that also ate "12 Oct" would push people back to pasting
+      the raw screenshot into a chatbot, which is the actual privacy failure this system is trying to
+      avoid.</p>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3>What the browser can see</h3>
+  <p class="mini">Nothing secret: <code>{{ cfg | tojson }}</code> is the whole configuration surface this
+    page receives, and it is the output of a redacting view — keys are printed as presence booleans, never
+    values. No token is ever embedded in a page, a form, or a script tag; the API keys live in this
+    process's environment only.</p>
+  <div class="row">
+    <form method="post" action="/me/wipe" onsubmit="return confirm('This DELETEs every claim, source, observation and action in this database.')">
+      <input name="confirm" placeholder="type WIPE" size="10" required>
+      <button style="background:#2a1414;border-color:#4d1f1f">right to erasure</button>
+    </form>
+    <span class="mini">The response returns the row counts the database reports after the DELETE, so the
+      claim is checkable rather than trusted.</span>
+  </div>
+</div>
+{% endblock %}

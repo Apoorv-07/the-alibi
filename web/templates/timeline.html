@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Timeline{% endblock %}
+{% block body %}
+<h1>Timeline</h1>
+<p class="sub">The ledger is time, not state. Each row is one field that moved, typed, with the direction
+  it moved in and the buffer it cost — computed from dates, never graded by a model.</p>
+<form class="inline" method="get">
+  <label class="mini">subject</label>
+  <select name="subject_id" onchange="this.form.submit()">
+    <option value="">— all {{ subjects | length }} subjects —</option>
+    {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject_id }}>{{ s }}</option>{% endfor %}
+  </select>
+  <span class="mini">{{ rows | length }} change(s) shown</span>
+</form>
+
+<div class="grid g4" style="margin:10px 0">
+  {% set hi = rows | selectattr('severity','eq','HIGH') | list | length %}
+  {% set cor = rows | selectattr('is_correction') | list | length %}
+  {% set early = rows | selectattr('direction','eq','EARLIER') | list | length %}
+  {{ stat(rows | length, 'changes', 'in the visible window') }}
+  {{ stat(hi, 'severe', 'severity = hours of buffer destroyed', 'bad' if hi else 'ok') }}
+  {{ stat(early, 'moved earlier', 'the only direction that hurts', 'warn' if early else 'ok') }}
+  {{ stat(cor, 'cross-source corrections', 'a fact that arrived from a different source', 'info') }}
+</div>
+
+<table>
+<thead><tr><th>when</th><th>kind</th><th>subject</th><th>what moved</th><th>direction</th>
+  <th class="num">buffer</th><th>authority</th><th>evidence</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr>
+  <td class="mini">{{ r.ts[11:19] }}<br>{{ r.ts[5:10] }}</td>
+  <td>{{ pill(r.kind, 'p-bad' if r.severity=='HIGH' else ('p-warn' if r.severity=='MED' else '')) }}</td>
+  <td><a href="/lineage?subject_id={{ r.subject_id }}">{{ r.subject_id }}</a>
+      <div class="mini">{{ r.predicate }}</div></td>
+  <td>{% if r.old_value %}<code>{{ r.old_value }}</code> → {% endif %}<code>{{ r.new_value or '∅' }}</code>
+      <div class="mini">{{ r.detail }}</div></td>
+  <td>{{ pill(r.direction or '—', 'p-bad' if r.direction=='EARLIER' else ('p-info' if r.direction=='LATER' else '')) }}</td>
+  <td class="num">{% if r.buffer_delta_hours %}{{ (r.buffer_delta_hours / 24) | round(1) }}d{% else %}—{% endif %}</td>
+  <td class="mini">{% if r.old_source and r.new_source %}{{ r.old_source }} → <b>{{ r.new_source }}</b>
+    {% else %}same source{% endif %}</td>
+  <td>{% if r.evidence_span %}<span class="quote" style="max-width:34ch;display:inline-block">{{ r.evidence_span[:110] }}</span>
+    {% else %}<span class="mini">—</span>{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="mini">Nothing changed. That is a fact about the documents, not a promise
+  from the system — re-sync after a notice goes up and this list grows.</td></tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

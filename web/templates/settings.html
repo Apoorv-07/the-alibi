@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block body %}
+<h1>Settings</h1>
+<p class="sub">What this instance is configured to do, read from the environment at startup. Values are
+  shown so you can check them; secrets are shown as presence only, and the API keys are never sent to
+  the browser at all.</p>
+<div class="grid g2">
+<div class="panel">
+  <h3>Runtime</h3>
+  <pre>{{ cfg | tojson(indent=1) }}</pre>
+  <h3>Provider probe (live)</h3>
+  <pre>mode       {{ prov.mode }}
+local      {{ prov.local | tojson }}
+cloud      {{ prov.cloud | tojson }}
+simulated  {{ prov.simulated }}
+note       {{ prov.fallback_note }}</pre>
+  <div class="notice {{ 'bad' if prov.simulated else '' }}">
+    {% if prov.simulated %}Extraction is running on the offline deterministic simulator. Everything on
+    the other pages is the real pipeline — the verifier, ledger, conflicts, solver — with a regex in the
+    extractor slot. Install a model to replace it:
+    <code>ollama pull gemma4:e4b</code>.
+    {% else %}A model answered the health probe. Its identity, version and latency are recorded on every
+    claim it touched, so a later disagreement can be attributed.{% endif %}
+  </div>
+</div>
+<div class="panel">
+  <h3>Institution policy (this is what makes it portable)</h3>
+  <pre>{{ policy | tojson(indent=1) }}</pre>
+  <p class="mini">Authority tiers, the 75% eligibility floor, the condonation floor, the supersession
+    rule and the late-submission default. Config, not code: a different college is a different file, and
+    <code>policy["authority"]</code> is the reason "the newest message wins" is not the rule.</p>
+</div>
+</div>
+<div class="panel" style="margin-top:12px">
+  <h3>Counts</h3>
+  <pre>{{ counts | tojson(indent=1) }}</pre>
+  <p class="mini">Database: <code>{{ db }}</code>. WAL mode, foreign keys on, busy timeout 4s.
+    Back it up with <code>sqlite3 {{ db }} ".backup twin.db"</code> and delete it to erase everything.</p>
+</div>
+{% endblock %}
