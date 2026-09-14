@@ -46,6 +46,12 @@ def pres(pair) -> Presentation:
     return Presentation(pair[1].twin)
 
 
+def norm(s: str) -> str:
+    """Compare wording, not whitespace: a date phrase uses non-breaking spaces on purpose (a value that wraps
+    in a narrow column is a value you misread), which would otherwise break every literal assertion."""
+    return s.replace("\xa0", " ")
+
+
 def text(html: str) -> str:
     # strip `<style>`/`<script>` *bodies* first: the inline layer-1 CSS contains `>` selectors, and a
     # tag regex that treats those as the end of a tag mangles the stylesheet before it ever reaches the text
@@ -325,9 +331,9 @@ def test_the_evidence_trail_phrases_every_value(pair):
     template may not reach for `|tojson` or a raw column."""
     c, _ = pair
     html = c.get("/evidence?subject=os-ia_1").text
-    body = text(html)
+    body = norm(text(html))
     assert "Where IA 1 came from" in body, "the heading is the task's name, not its primary key"
-    assert "Fri 28 Aug 2026 (date only, no time)" in body, body[:600]
+    assert "Fri 28 Aug 2026" in body and "date only, no time" in body, body[:600]
     assert "15% of the grade" in body
     for leak in ("syllabus_pdf", "due_at", "precision", '"date"', "&quot;date"):
         assert leak not in html, f"raw column `{leak}` reached the page"
@@ -391,3 +397,22 @@ def test_a_review_card_says_something_new_in_every_line(pair):
             assert leak not in it["body"], (leak, it["body"])
         # the two named sources are named, because that is the whole reason a human is being asked
         assert " and " in it["body"], it["body"]
+
+
+def test_evidence_rows_keep_the_value_and_its_quote_together(pair):
+    """The evidence groups used to be a four-column table, which forced a choice between a date wrapped over
+    three lines and a verbatim quote printed over its neighbour — on a page whose entire purpose is the quote.
+    So: one row per claim, the receipt inside the same element as the value it proves, and no sibling table
+    column for the quote to escape into. (The pixel half of this claim — nothing clipped, date on one line —
+    is measured at three viewports by `make browser-check`.)"""
+    c, _ = pair
+    html = c.get("/evidence").text
+    assert '<ol class="claims"' in html, "the evidence group must be a claim list, not a squeezed table"
+    assert 'class="tbl"' not in html, "a four-column table cannot hold a 60-char quote and a date"
+    row = html[html.index('<li class="claim">'):html.index('<li class="claim">') + 3000]
+    assert 'class="claim__value"' in row and 'class="quote' in row, "value and receipt belong to one row"
+    assert "chars " in row, "the offsets are what make a quote checkable against the document"
+    body = norm(text(html))
+    assert "Wed 30 Sep 2026 date only, no time" in body, body[:400]
+    for leak in ("{&quot;", '"date"', "precision", "syllabus_pdf"):
+        assert leak not in html, f"raw column {leak} reached the page"

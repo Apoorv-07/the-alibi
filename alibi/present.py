@@ -178,41 +178,59 @@ def title_for(subject_id: str, claims: Iterable[dict] = ()) -> str:
     return words
 
 
-def value_phrase(v: Any) -> str:
-    """`{"date": "2026-10-12", "precision": "day"}` → `Mon 12 Oct 2026`.
+def value_parts(v: Any) -> tuple[str, str]:
+    """(the value itself, the qualifier that explains it) — `("Wed 30 Sep 2026", "date only, no time")`.
 
-    An option's `label` column in this database contains the raw value JSON (it was written by the extractor,
-    not by a copywriter). Rendering it verbatim is how a review card reads `"date": "2026-10-12", "precision"`
-    to a student. So: read the value, phrase it, and fall back to the raw text only when it is not structured.
+    Two fields because one string is what a *sentence* needs and two is what a *table cell* needs: a
+    date in a narrow Value column wrapped to four lines, and the "(date only, no time)" note — the single
+    most important caveat on the row — got buried mid-sentence. `value_phrase()` is the join of these, so
+    prose and tables can never disagree about the value.
     """
     if isinstance(v, str):
         s = v.strip()
-        if s.startswith("{") or s.startswith("["):
+        if s[:1] in "{[":
             try:
                 v = json.loads(s)
             except ValueError:
-                return s
+                return s, ""
         else:
-            try:                                        # `2026-10-12` in a *label* is a date, not prose
+            try:
                 d = dt.date.fromisoformat(s[:10])
             except ValueError:
-                return s
-            return s if len(s) > 10 else f"{d:%a %d %b %Y}"
+                return s, ""
+            return (f"{d:%a %d %b %Y}", "") if len(s) == 10 else (s, "")
     if isinstance(v, dict):
         d = _date_of(v)
         if d:
-            return f"{d:%a %d %b %Y}" + (" (date only, no time)" if v.get("precision") == "day" else "")
+            # non-breaking spaces inside the date: a value that wraps is a value you misread
+            main = f"{d:%a\xa0%d\xa0%b\xa0%Y}"
+            return main, ("date only, no time" if v.get("precision") == "day" else "")
         if "weight" in v:
             try:
-                return f"{float(v['weight']) * 100:g}% of the grade"
+                return f"{float(v['weight']) * 100:g}%", "of the grade"
             except (TypeError, ValueError):
                 pass
         if "text" in v:
-            return str(v["text"])[:160]
-        return ", ".join(f"{k.replace('_', ' ')} {val}" for k, val in list(v.items())[:3])[:160]
+            return str(v["text"])[:160], ""
+        return ", ".join(f"{k.replace('_', ' ')} {val}" for k, val in list(v.items())[:3])[:160], ""
     if isinstance(v, list):
-        return " · ".join(value_phrase(x) for x in v[:3])
-    return str(v)[:160]
+        return " · ".join(value_phrase(x) for x in v[:3]), ""
+    return str(v)[:160], ""
+
+
+def value_phrase(v: Any) -> str:
+    """`{"date": "2026-10-12", "precision": "day"}` → `Wed 12 Oct 2026 date only, no time`.
+
+    One line of phrasing, built by `value_parts()`. An option's `label` column in this database contains the
+    raw value JSON (written by the extractor, not a copywriter), so rendering that column verbatim is how a
+    review card reads `"date": "2026-10-12", "precision"` to a student. Read the value, phrase it, and fall
+    back to the raw text only when it is genuinely unstructured.
+    """
+    main, qual = value_parts(v)
+    if not qual:
+        return main
+    # a weight reads as prose ("15% of the grade"); a caveat reads as a caveat ("… (date only, no time)")
+    return f"{main} {qual}" if qual.split(" ", 1)[0] in ("of", "in", "on", "per") else f"{main} ({qual})"
 
 
 def option_label(o: Any) -> str:
@@ -775,7 +793,7 @@ class Presentation:
         for r in rows:
             r["verify_word"] = verify_word(r.get("verify_state"))
             r["predicate_word"] = predicate_word(r["predicate"])
-            r["value_text"] = self._value_text(r)
+            r["value_text"], r["value_qual"] = self._value_parts(r)
             r["source_word"] = source_word(r.get("orig_kind"), r.get("source_label"))
             r["quote"] = (r.get("evidence_span") or "").strip()
             groups.setdefault(r["subject_id"], []).append(r)
@@ -786,7 +804,7 @@ class Presentation:
             lin = self.db.lineage(subject)
             for c in (lin.get("claims") or []):
                 _decode(c)
-                c["value_text"] = self._value_text(c)
+                c["value_text"], c["value_qual"] = self._value_parts(c)
                 c["predicate_word"] = predicate_word(c.get("predicate") or "")
                 c["verify_word"] = verify_word(c.get("verify_state"))
                 c["source_word"] = source_word(kinds.get(c.get("source_id")),
@@ -802,6 +820,10 @@ class Presentation:
         cards.sort(key=lambda c: (c["course"], c["title"]))
         return {"cards": cards, "count": len(rows), "q": q, "subject": subject, "trail": trail,
                 "filtered": bool(q or subject)}
+
+    @staticmethod
+    def _value_parts(row: dict) -> tuple[str, str]:
+        return value_parts(row.get("value") or {})
 
     @staticmethod
     def _value_text(row: dict) -> str:

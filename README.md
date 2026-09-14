@@ -26,7 +26,7 @@ make dev                             # diagnoses the environment, seeds the demo
 Open <http://localhost:8000>. Then, anywhere:
 
 ```bash
-make verify                          # 194 tests + the probes + the HTTP smoke run, ~15s, no GPU, no key
+make verify                          # 195 tests + the probes + the HTTP smoke run, ~15s, no GPU, no key
 python3 -m alibi.cli status          # the same numbers the UI shows, from the same rows
 curl -s localhost:8000/api/health | python3 -m json.tool
 ```
@@ -195,9 +195,9 @@ only, and the reader can veto it from Settings for the whole browser. `docs/UI-D
 ## The rest of the surface
 
 ```bash
-make test          # 194 tests (~10s), incl. tests/test_renovation.py: the six destinations + the language contract
+make test          # 195 tests (~10s), incl. tests/test_renovation.py: the six destinations + the language contract
 make smoke         # boots on an EMPTY db, seeds, renders all 24 pages (200, or 302→/onboard when cold), /static/*, traversal, the manual-answer loop
-make browser-check   # 99 checks in Chromium across both design systems (`make browser` installs what it needs, once): the fluid layer paints, the calm pages carry no canvas/cursor/inertia at 4 viewports, both sync round trips report in one sentence
+make browser-check   # 111 checks in Chromium across both design systems (`make browser` installs what it needs, once): the fluid layer paints, the calm pages carry no canvas/cursor/inertia at 4 viewports and the evidence rows never clip, both sync round trips report in one sentence
 make checks        # focused probes: verifier edges, attribution, scenario calibration
 make eval          # regenerate EVAL_REPORT.{md,json} (zero model calls needed)
 make serve | seed | retention | docker | docker-llm | lint | clean

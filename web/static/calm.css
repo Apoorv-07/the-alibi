@@ -179,9 +179,14 @@ html[data-calm] .evi__g { padding: 16px 18px; background: var(--c-surface); bord
   border-radius: var(--c-radius); }
 html[data-calm] .evi__h h3 a { color: var(--c-ink); text-decoration: none; }
 html[data-calm] .evi__h h3 a:hover { color: var(--c-accent); }
-html[data-calm] .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .88rem; }
-html[data-calm] .tbl th { text-align: left; font: 500 .72rem/1 var(--mono); letter-spacing: .06em;
-  text-transform: uppercase; color: var(--c-ink-3); padding: 0 12px 8px 0; border-bottom: 1px solid var(--c-line); }
+html[data-calm] .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .88rem;
+  background: none; color: inherit; }
+/* the technical pages paint table heads as a dark band; on a calm page that is the one place a rectangle
+   outshouts its content, and a 3-character column wrapped "WHAT IT SAYS" onto three lines. Flat head, and a
+   column wide enough to hold its own label. */
+html[data-calm] .tbl th { text-align: left; font: 500 .72rem/1.2 var(--mono); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--c-ink-3); padding: 0 12px 8px 0; border-bottom: 1px solid var(--c-line);
+  background: none; white-space: nowrap; }
 html[data-calm] .tbl td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--c-line);
   vertical-align: top; color: var(--c-ink); }
 html[data-calm] .tbl tr:last-child td { border-bottom: 0; }
@@ -359,3 +364,31 @@ html[data-calm] form[id^=defer-], html[data-calm] form[id^=dismiss-]{display:non
 
 html[data-calm] .recent__note { font-size: .82rem; color: var(--c-ink-3); flex: 1 1 100%; }
 html[data-calm] .tag--soft { background: #eceff4cc; color: var(--c-ink-3); }
+
+/* ── evidence: one claim per line, the receipt under it ────────────────────────────────────────────────
+   Deliberately not a table. A row has three parts of very different length (a two-word predicate, a 17-char
+   date, a 60-char quote) and a fixed column grid either breaks the date across three lines or lets the quote
+   walk over its neighbour. Here the head line wraps naturally and the quote owns its own width. */
+html[data-calm] .claims { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 14px; }
+html[data-calm] .claim { padding-top: 12px; border-top: 1px solid var(--c-line); }
+html[data-calm] .claim:first-child { border-top: 0; padding-top: 0; }
+html[data-calm] .claim__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0; }
+html[data-calm] .claim__what { font: 500 .74rem/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--c-ink-3); }
+html[data-calm] .claim__value { font-size: 1.02rem; font-weight: 560; color: var(--c-ink); }
+html[data-calm] .claim__state { font-size: .84rem; color: var(--c-ok); }
+html[data-calm] .vqual { font: 400 .76rem/1.4 var(--sans); color: var(--c-ink-3); }
+html[data-calm] .quote--sm { margin-top: 6px; }
+html[data-calm] .tbl th:nth-child(3), html[data-calm] .tbl td:nth-child(3) { width: 39%; }
+html[data-calm] .tbl th:nth-child(4), html[data-calm] .tbl td:nth-child(4) { width: 21%; }
+@media (max-width: 700px) {
+  /* on a phone a fixed four-column table is unreadable, so the grid becomes a stacked list of labelled rows */
+  html[data-calm] .tbl { table-layout: auto; display: block; }
+  html[data-calm] .tbl thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  html[data-calm] .tbl tbody, html[data-calm] .tbl tr, html[data-calm] .tbl td { display: block; width: auto; }
+  html[data-calm] .tbl td { padding: 2px 0; white-space: normal; border-bottom: 0; }
+  html[data-calm] .vqual { display: inline; }
+  html[data-calm] .tbl tr { padding: 10px 0; border-bottom: 1px solid var(--c-line); }
+  html[data-calm] .tbl td::before { content: attr(data-label) " "; font: 500 .7rem/1 var(--mono);
+    letter-spacing: .06em; text-transform: uppercase; color: var(--c-ink-3); display: block; }
+}

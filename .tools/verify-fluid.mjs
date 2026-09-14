@@ -626,6 +626,30 @@ for (const vp of VIEWPORTS) {
           `${cm.railDisplay}/${cm.railPos}/${cm.railBottom}`);
     check(`${vp.name} (calm): tablet tap targets >= 40px`, cm.tap.filter(x => x < 40).length === 0, cm.tap.join(","));
   }
+  /* evidence rows, measured: the page is the trust layer, so its two failure modes are a value that wraps
+     into unreadability and a quote that overflows its box. Both are geometry, so both are checked here. */
+  const { page: ep } = await openPage(ctx, "/evidence", { settle: 300 });
+  const ev = await ep.evaluate(() => {
+    const rows = [...document.querySelectorAll(".claim")];
+    const clipped = [...document.querySelectorAll(".claim, .claim__head, .quote, .claim__value")]
+      .filter(n => n.scrollWidth > n.clientWidth + 1)
+      .map(n => n.className + " " + n.textContent.trim().slice(0, 24));
+    return {
+      rows: rows.length,
+      withQuote: rows.filter(r => r.querySelector(".quote")).length,
+      valueLines: rows.map(r => { const v = r.querySelector(".claim__value");
+        return v ? Math.round(v.getBoundingClientRect().height / parseFloat(getComputedStyle(v).lineHeight || "22")) : 0; }),
+      clipped,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  check(`${vp.name} (calm): every evidence row carries its receipt`,
+        ev.rows > 0 && ev.withQuote === ev.rows, `${ev.withQuote}/${ev.rows} rows have a quote`);
+  check(`${vp.name} (calm): an evidence value stays on one line`,
+        ev.valueLines.every(n => n <= 1), `lines per row: ${ev.valueLines.join(",")}`);
+  check(`${vp.name} (calm): nothing on the evidence page is clipped`,
+        ev.clipped.length === 0 && ev.overflow <= 1, ev.clipped.slice(0, 3).join(" | ") || `${ev.overflow}px`);
+  await ep.close();
   check(`${vp.name} (calm): console clean`, cerr.length === 0, cerr.slice(0, 2).join(" | "));
   if (shots) await cp.screenshot({ path: `.tools/shot-calm-${vp.name}.png`, timeout: 12000 }).catch(() => {});
   await cp.close();

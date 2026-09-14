@@ -23,7 +23,7 @@
     <li class="flow__step">
       <p class="flow__h"><b>{{ c.predicate_word }}</b> · {{ c.verify_word }}
         <span class="mono faint">claim {{ c.id }}</span></p>
-      <p class="flow__v">{{ c.value_text }}</p>
+      <p class="flow__v">{{ c.value_text }}{% if c.value_qual %} <span class="vqual">{{ c.value_qual }}</span>{% endif %}</p>
       {% if c.quote %}
       <blockquote class="quote">{{ c.quote }}</blockquote>
       <p class="mini faint">from {{ c.source_word }} · chars {{ c.char_start }}–{{ c.char_end }} of the document
@@ -61,22 +61,32 @@
       <p class="mini">{{ g.course }} · {{ g.n }} claim{{ '' if g.n == 1 else 's' }} ·
         {{ g.verified }} verified{% if g.n > g.verified %}, {{ g.n - g.verified }} not{% endif %}</p>
     </header>
-    <table class="tbl">
-      <caption class="sr-only">Claims about {{ g.title }}</caption>
-      <thead><tr><th scope="col">What it says</th><th scope="col">Value</th><th scope="col">Source</th>
-        <th scope="col">Status</th></tr></thead>
-      <tbody>
-        {% for c in g.claims %}
-        <tr>
-          <td>{{ c.predicate_word }}{% if c.valid_to %} <span class="tag">superseded</span>{% endif %}</td>
-          <td>{{ c.value_text }}</td>
-          <td>{{ c.source_word }}{% if c.quote %}
-            <blockquote class="quote quote--sm">{{ c.quote | truncate(150) }}</blockquote>{% endif %}</td>
-          <td>{{ c.verify_word }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {# A four-column table asked to hold a 60-character verbatim quote *and* a date does neither: at 18ch the
+       date wrapped to three lines, and any narrower and the value printed over its neighbour. The receipt is
+       the point of this page, so the row is built around it — one claim per line, quote underneath, at the
+       width the text needs. Tables stay on the technical pages, where a column per field is the honest shape. #}
+    <ol class="claims" aria-label="claims about {{ g.title }}">
+      {% for c in g.claims %}
+      <li class="claim">
+        <p class="claim__head">
+          <b class="claim__what">{{ c.predicate_word }}</b>
+          <span class="claim__value">{{ c.value_text }}</span>
+          {% if c.value_qual %}<span class="vqual">{{ c.value_qual }}</span>{% endif %}
+          {% if c.valid_to %}<span class="tag">superseded</span>{% endif %}
+          <span class="claim__state">{{ c.verify_word }}</span>
+          <span class="mono faint">claim {{ c.id }}</span>
+        </p>
+        {% if c.quote %}
+        <blockquote class="quote quote--sm">{{ c.quote }}</blockquote>
+        <p class="mini faint">from {{ c.source_word }} · chars {{ c.char_start }}–{{ c.char_end }}
+          {% if c.captured_at %}· read {{ c.captured_at[:10] }}{% endif %}</p>
+        {% else %}
+        <p class="mini faint">No quote on this row, so ALIBI does not treat it as verified —
+          {{ c.verify_word|lower }}{% if c.source_word %} · {{ c.source_word }}{% endif %}</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
   </article>
   {% endfor %}
 </section>

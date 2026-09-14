@@ -122,9 +122,9 @@ not even *create* the canvas, orb or cursor nodes: absent is a stronger promise 
 ## Verifying an interface change
 
 ```bash
-make test                       # 194 tests, incl. tests/test_renovation.py (36, the language contract)
+make test                       # 195 tests, incl. tests/test_renovation.py (37, the language contract)
 ./.venv/bin/python scripts/smoke.py     # 24/24 pages render cold + seeded, no template flags
-make browser-check                      # 99 checks in Chromium: both design systems
+make browser-check                      # 111 checks in Chromium: both design systems
 node .tools/e2e-review.mjs                # and the one irreversible act, driven through the real Review form
 node .tools/verify-fluid.mjs --shots    # …and .tools/shot-calm-*.png per viewport
 ```
