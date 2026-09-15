@@ -656,9 +656,20 @@ class Twin:
     def forecasts(self) -> list[dict]:
         return self.db.forecasts(limit=30)
 
-    def run_pipeline(self, *, today: str | None = None, horizon_days: int = 14) -> dict:
-        """Change detection → feasibility → forecast → counters. Called after an ingest and by the
-        scheduler; it reads only rows, so it can be replayed and its output diffed."""
+    def run_pipeline(self, *, today: str | None = None, horizon_days: int = 14,
+                     record: bool = True) -> dict:
+        """Change detection → feasibility → forecast → counters.
+
+        `record=False` computes without committing anything, which is what a *read* needs. This parameter
+        exists because the method's previous docstring claimed it "reads only rows" and it did not: it writes
+        a run summary and one `change_event` per forecast, and it was being called from GET handlers (Home,
+        Tasks, Feasibility, Risk, Ask). Twenty-seven page views appended 48 rows to the change log — so the
+        band that tells a student "here is what changed in your obligations" was filling with rows produced by
+        *looking at the page*, and the count in `/metrics` grew on every refresh. A ledger artifact must be
+        written by the run that changed the ledger, not by a render.
+
+        Write paths (`alibi.cli sync|ingest`, the seed/demo routine, the upload route) keep `record=True`.
+        """
         today = today or _today().isoformat()
         L = self.db.derive_ledger()
         att = None
@@ -671,7 +682,8 @@ class Twin:
                                              total_sessions=a["total"], attended=a.get("attended"),
                                              today=today)
         except Exception as e:
-            self.db.audit("risk", "attendance_forecast_failed", "week:all", after={"err": str(e)[:200]})
+            if record:
+                self.db.audit("risk", "attendance_forecast_failed", "week:all", after={"err": str(e)[:200]})
         tasks = [{"id": t.id, "title": t.title, "minutes_remaining": t.minutes, "due": t.safe_due,
                   "requires": list(t.requires)} for t in self._tasks_from_ledger(L)]
         decay = RK.buffer_decay(tasks, today=today)
@@ -681,6 +693,10 @@ class Twin:
         rid = self.db.one("SELECT id FROM run ORDER BY id DESC LIMIT 1")
         run_id = str(rid["id"]) if rid else ""
         st = self.db.stats()
+        if not record:
+            # solve, return, commit nothing: no run counters, no forecast rows, no change events
+            return {"risks": [r.sentence() for r in risks], "summary": RK.summarise(risks),
+                    "feasibility": feas, "rows": [r.as_forecast() for r in risks]}
         self.db.record_run_claims(int(run_id) if run_id else 0,
                                  grounded=st["claims_verified"],
                                  rejected=st["claims_review"] - st.get("reviews_open", 0),

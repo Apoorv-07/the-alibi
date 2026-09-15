@@ -299,7 +299,9 @@ def create_app(twin: Twin | None = None) -> FastAPI:
             cards = [c for c in cards if c["overdue"]]
         elif state_f == "done":
             cards = [c for c in cards if c["state"] == "done"]
-        plan = present._plan_words((twin.run_pipeline().get("feasibility") or {}), {})
+        # record=False: this is a GET. The plan shown here is the one the last run computed, and a page
+        # view must not append rows to the change log it is also displaying.
+        plan = present._plan_words((twin.run_pipeline(record=False).get("feasibility") or {}), {})
         return page(request, "tasks.html", calm=True, cards=cards, cards_all=all_cards, plan=plan,
                     course=course, state_f=state_f,
                     all_courses=sorted({c["course"] for c in all_cards}))
@@ -381,7 +383,7 @@ def create_app(twin: Twin | None = None) -> FastAPI:
 
     @app.get("/feasibility", response_class=HTMLResponse)
     def feasibility(request: Request):
-        pl = twin.run_pipeline()
+        pl = twin.run_pipeline(record=False)
         f = pl.get("feasibility") or {}
         return page(request, "feasibility.html", f=f, risks=pl["risks"], summary=pl["summary"],
                     remedies=f.get("remedies") or [], tasks=_planned_tasks(twin),
@@ -391,7 +393,7 @@ def create_app(twin: Twin | None = None) -> FastAPI:
     def risk(request: Request):
         return page(request, "risk.html", rows=twin.forecasts(),
                     counts={"PROVEN_INFEASIBLE": 0, "AT_RISK": 0, "PENDING": 0, "ON_TRACK": 0} |
-                    (twin.run_pipeline()["summary"]["counts"] if True else {}))
+                    (twin.run_pipeline(record=False)["summary"]["counts"]))
 
     @app.get("/actions", response_class=HTMLResponse)
     def actions(request: Request):

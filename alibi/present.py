@@ -427,7 +427,9 @@ class Presentation:
         open_cards = [c for c in cards if c["state"] != "done"]
         week_end = today + dt.timedelta(days=6)
         attention = self.attention()
-        planned = self.twin.run_pipeline() if open_cards else {}
+        # record=False — Home is a read, and it renders the change band, so a render that wrote a change row
+        # would feed itself: the page about "what changed" growing because the page was opened.
+        planned = self.twin.run_pipeline(record=False) if open_cards else {}
         feas = planned.get("feasibility") or {}
         changes = self.db.changes(limit=6)
         return {
@@ -895,7 +897,7 @@ class Presentation:
                              "detail": f"{len(claims)} claims, {len(lin.get('edges') or [])} supersessions/links",
                              "claims": [c["id"] for c in claims[:6]]}]
         elif intent == "fit":
-            p = self._plan_words(self.twin.run_pipeline().get("feasibility") or {}, {})
+            p = self._plan_words(self.twin.run_pipeline(record=False).get("feasibility") or {}, {})
             answer = p["headline"] + " " + p["body"]
             receipts = [{"kind": "plan", "subject": "solver", "label": "the solver's own numbers",
                          "detail": "run on the current horizon", "claims": []}] if p["state"] != "unknown" else []

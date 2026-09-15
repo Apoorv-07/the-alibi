@@ -455,6 +455,39 @@ page looks empty for the first 200 ms.
 Ollama/LM Studio configured, since `routing()` deliberately re-probes). Accepted: the alternative is a health
 page that is stale, which is the failure this component exists to prevent.
 
+---
+
+## A33. A read path computes; it does not commit
+
+**CHOSEN.** `Twin.run_pipeline(record=False)` is what every GET handler calls (Home, Tasks, Feasibility,
+Risk, Ask, `alibi plan`); `record=True` stays with the write paths that own a `run` row — `alibi sync`,
+`alibi ingest`, the demo seed, the upload route. `run_pipeline` is not a query: it writes run counters and one
+`change_event` per forecast, and its docstring used to say "it reads only rows", which is how it ended up
+inside page handlers. Separately, `db.record_forecast` now compares the incoming status with the newest stored
+row and appends a change event **only on a difference**, and `db.forecasts()` selects the newest row per
+subject (the table is append-only history by design, and `INSERT OR REPLACE` cannot collapse it because there
+is no UNIQUE key on the subject — deliberately, so a run's forecast survives an audit).
+
+**WHY IT MATTERS.** Twenty-seven page views appended 48 `change_event` rows. The band that answers "what
+changed in my obligations" was filling with rows produced by *looking at the page*, `alibi_changes` in
+`/metrics` climbed on every refresh, and an idempotent re-sync (the exact thing the UI's re-read button is)
+doubled the log while changing nothing. The duplicate rows also leaked twice more: `/risk` listed every
+obligation twice after two syncs, and `risk.assess(calibration=db.forecasts())` calibrated over repeats as if
+they were independent observations. A ledger artifact must be written by the event that changed the ledger.
+
+**REJECTED.** Caching the pipeline output to hide the cost of re-solving on read (the write would still
+happen on a cache miss, and a stale plan is a wrong plan); letting `change_event` record repeats and telling
+users to ignore the growth (the count is the product's claim, not a log to be skimmed); adding a UNIQUE index
+on `risk_forecast` to force de-duplication at write time (it would delete the forecast history the audit
+depends on, and the read is the correct place to pick "current").
+
+**PINNED BY.** `tests/test_api.py::test_a_page_view_writes_nothing_at_all` (every walk-list page plus the ops
+endpoints, twice: zero rows added in nine tables) and `::test_an_unchanged_resync_records_no_change_but_still_records_a_run`
+(change log flat at the seeded 30, while `run`, `audit` and `model_invocation` all grow, and
+`db.forecasts()` stays one row per subject).
+
+---
+
 ## Open / unresolved (recorded, not hidden)
 
 1. **Title matching is a shape, not a parser.** "the report due before Diwali" is not claimed. The right fix is

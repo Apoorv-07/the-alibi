@@ -173,7 +173,9 @@ def cmd_conflicts(t: Twin, args) -> int:
 
 
 def cmd_plan(t: Twin, args) -> int:
-    out = t.run_pipeline()
+    # `alibi plan` is a question, not an event: it must not append change rows or run counters the way
+    # `alibi sync` legitimately does.
+    out = t.run_pipeline(record=False)
     f = out.get("feasibility") or {}
     print(f"solver: {f.get('status')} · {f.get('head_line') or f.get('reason') or ''}")
     if f.get("core"):

@@ -130,6 +130,65 @@ def test_the_calendar_export_is_a_real_ics_file_not_a_500(client):
     assert "CATEGORIES:" in body and "DESCRIPTION:" in body, "no course and no provenance in the import"
 
 
+# ---------------------------------------------------------------------- reads write nothing ---
+#
+# The reason this section exists: `Twin.run_pipeline()` looks like a query and is a write — it records a run
+# summary and a `change_event` per forecast — and it was being called from GET handlers (Home, Tasks,
+# Feasibility, Risk, Ask). Twenty-seven page views appended 48 rows to the change log. The consequence is not
+# disk noise: the band that tells a student "here is what changed in your obligations" was filling with rows
+# produced by *looking at the page*, and `/metrics`' `alibi_changes` climbed on every refresh, which makes the
+# one number the product is judged on unfalsifiable. These tests are the cheapest way to keep it true.
+
+_LEDGER_TABLES = ("change_event", "audit", "run", "model_invocation", "risk_forecast",
+                  "claim", "observation", "conflict", "review_item")
+
+
+def _counts(state):
+    return {t: state.twin.db.one(f"SELECT count(*) n FROM {t}")["n"] for t in _LEDGER_TABLES}
+
+
+def test_a_page_view_writes_nothing_at_all(client):
+    """Every page in the demo walk list, plus the ops endpoints, twice over: zero rows added anywhere."""
+    import sys
+    c, state = client
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from smoke import PAGES as pages
+
+    c.post("/api/sync", data={"demo": "true"})
+    before = _counts(state)
+    for _ in range(2):
+        for path in pages + ["/healthz", "/readyz", "/metrics", "/api/health", "/api/graph?task=os-ia_1",
+                             "/?ask=what+is+due+next", "/review", "/evidence?subject=os-ia_1"]:
+            r = c.get(path)
+            assert r.status_code in (200, 302), (path, r.status_code)
+    after = _counts(state)
+    assert after == before, f"a read wrote rows: " + ", ".join(
+        f"{k} {v}→{after[k]}" for k, v in before.items() if after[k] != v)
+
+
+def test_an_unchanged_resync_records_no_change_but_still_records_a_run(client):
+    """The fix must not be "stop logging". A re-sync of an unchanged corpus changes nothing in the student's
+    obligations, so the change log must stay level — but it *did* re-read six documents and re-verify 18
+    quotes, so the run, audit and model-invocation history must grow or the ledger would be hiding work."""
+    c, state = client
+    c.post("/api/sync", data={"demo": "true"})
+    first = _counts(state)
+    assert first["change_event"] == 30, first          # 18 new + 8 feasibility + 3 date + 1 quarantine
+    c.post("/api/sync", data={"demo": "true"})
+    second = _counts(state)
+    assert second["change_event"] == first["change_event"], \
+        f"an idempotent re-sync added change rows: {first} → {second}"
+    assert second["claim"] == first["claim"] == 18, "de-duplication must still hold"
+    assert second["run"] > first["run"], "the re-sync really happened and must be visible in the run history"
+    assert second["audit"] > first["audit"], "and in the audit trail"
+    assert second["model_invocation"] > first["model_invocation"], "and in the model-call ledger"
+    # …and one current forecast per subject, not one per run: two syncs used to double every row of
+    # /technical/risk and feed the duplicates to `calibrate()` as if they were independent observations.
+    rows = state.twin.db.forecasts(limit=30)
+    keys = [(r["subject_type"], r["subject_id"]) for r in rows]
+    assert len(keys) == len(set(keys)), f"forecast history leaked into the current view: {keys}"
+
+
 # ---------------------------------------------------------------- internal links ---
 
 def test_no_page_links_to_a_route_that_does_not_exist(client):

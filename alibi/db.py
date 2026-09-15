@@ -564,6 +564,12 @@ class DB:
                         subject_id: str, probability: float, method: str, status: str,
                         basis: dict | None = None, evidence: str = "", recommendation: str = "",
                         subject_type: str = "week", is_prediction: bool = True) -> int:
+        # Read the previously stored status first, so the log below records a *diff*. Without this, every
+        # recorded run appended one row per subject whether or not anything changed: two syncs of an
+        # unchanged corpus doubled the "what changed" band, which is the opposite of what it claims.
+        prev = self.one("""SELECT status FROM risk_forecast WHERE subject_type=? AND subject_id=?
+                           ORDER BY computed_at DESC, id DESC LIMIT 1""", (subject_type, subject_id))
+        changed = prev is None or (prev["status"] or "") != (status or "")
         rid = self.x("""INSERT OR REPLACE INTO risk_forecast(run_id,computed_at,horizon_start,
                         horizon_end,subject_type,subject_id,probability,method,basis_json,status,
                         evidence,recommendation,is_prediction)
@@ -571,6 +577,8 @@ class DB:
                      (run_id, now(), horizon_start, horizon_end, subject_type, subject_id,
                       probability, method, json.dumps(basis or {}, ensure_ascii=False), status,
                       evidence, recommendation, int(is_prediction)))
+        if not changed:
+            return rid
         self.record_change(kind="ATTENDANCE_RISK_CHANGED" if method == "attendance_closed_form"
                            else "FEASIBILITY_STATUS_CHANGED", subject_type=subject_type,
                            subject_id=subject_id, old_value="", new_value=status,
@@ -579,8 +587,21 @@ class DB:
         return rid
 
     def forecasts(self, limit: int = 20) -> list[dict]:
-        rows = self.q("""SELECT * FROM risk_forecast ORDER BY computed_at DESC, id DESC LIMIT ?""",
-                      (limit,))
+        """The current forecast per subject — one row each, never a stack of rewrites.
+
+        `risk_forecast` is deliberately append-only history (every run keeps its row, `run_id` and
+        `computed_at` included), and `record_forecast`'s `INSERT OR REPLACE` cannot collapse it because the
+        table has no UNIQUE key on the subject on purpose: a forecast log that loses its history is a
+        forecast log you cannot audit. So the *read* has to pick the newest row per subject. It used not to,
+        and the consequence was visible twice over: two syncs made `/technical/risk` list every obligation
+        twice under a heading that promises "proven and predicted, in separate columns", and
+        `risk.assess(calibration=…)` calibrated over the duplicated rows, which silently weights whatever
+        was re-run most recently. id is monotonic, so MAX(id) is the newest row.
+        """
+        rows = self.q("""SELECT * FROM risk_forecast
+                         WHERE id IN (SELECT MAX(id) FROM risk_forecast
+                                      GROUP BY subject_type, subject_id)
+                         ORDER BY computed_at DESC, id DESC LIMIT ?""", (limit,))
         for r in rows:
             r["basis"] = json.loads(r.pop("basis_json") or "{}")
             r["is_prediction"] = bool(r["is_prediction"])
