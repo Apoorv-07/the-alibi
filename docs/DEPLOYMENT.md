@@ -14,6 +14,7 @@ pip install -r requirements.txt          # 7 pins: ortools, fastapi, uvicorn[sta
 cp .env.example .env                      # optional; an empty .env is a valid offline configuration
 make seed                                 # ALIBI_DB=… python3 -m alibi.cli sync
 make serve                                # uvicorn alibi.server:app --host 0.0.0.0 --port 8000
+make serve PORT=8080                      # same, on another port (also `PORT=8080 make dev`)
 ```
 
 `make seed` is **idempotent**: a second run reports `promoted=0` per source, the ledger stays at 18 claims and

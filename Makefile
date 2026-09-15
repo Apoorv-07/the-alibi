@@ -32,8 +32,8 @@ eval:            ## regenerate EVAL_REPORT.{md,json} (zero model calls needed)
 seed:            ## ingest the demo corpus into $$ALIBI_DB (idempotent)
 	sh scripts/seed.sh
 
-serve:           ## the web app on :8000, seeding if the database is empty
-	ALIBI_DB=$${ALIBI_DB:-./alibi.db} $(PY) -m uvicorn alibi.server:app --host 0.0.0.0 --port 8000
+serve:           ## the web app on :8000 (`PORT=8080 make serve`); run `make seed` or `make dev` first if empty
+	ALIBI_DB=$${ALIBI_DB:-./alibi.db} $(PY) -m uvicorn alibi.server:app --host 0.0.0.0 --port $${PORT:-8000}
 
 dev:             ## one command: diagnose the environment, seed if empty, serve
 	$(PY) scripts/dev.py

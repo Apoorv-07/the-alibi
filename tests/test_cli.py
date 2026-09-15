@@ -93,3 +93,44 @@ def test_bad_invocations_fail_loudly_not_silently(tmp_path, args):
     r = run(*args, db=db)
     assert r.returncode != 0, f"{args} was accepted and said nothing"
     assert "Traceback" not in r.stdout + r.stderr, (r.stdout + r.stderr)[-400:]
+
+
+# ------------------------------------------------- the developer entry points ---
+#
+# `make serve` hardcoded `--port 8000` while README troubleshooting told people `PORT=8080 make dev`. Both
+# halves were defensible; the mismatch was not — a documented variable that one target ignores is a trap, and
+# the trap springs on whatever machine already has 8000 busy (a preview proxy, another FastAPI app). These two
+# tests run the real targets with a stubbed interpreter, so they check the command line the developer gets.
+
+def test_make_serve_takes_its_port_from_the_environment(tmp_path):
+    """`PY=echo` turns the recipe into a printout: no server, no port to fight over, and the exact argv make
+    would run. The port must come from `PORT`, and `ALIBI_DB` must still be exported to the child."""
+    import subprocess
+
+    r = subprocess.run(["make", "-s", "serve", "PY=echo", "PORT=9123", f"ALIBI_DB={tmp_path}/x.db"],
+                       cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "--port 9123" in r.stdout, r.stdout
+    assert "--host 0.0.0.0" in r.stdout, "a server bound to loopback is unreachable from a preview proxy"
+    assert "alibi.server:app" in r.stdout, r.stdout
+
+    d = subprocess.run(["make", "-s", "serve", "PY=echo", f"ALIBI_DB={tmp_path}/y.db"],
+                       cwd=str(ROOT), capture_output=True, text=True, timeout=60)
+    assert "--port 8000" in d.stdout, "the default stays 8000 so the README example is still true"
+
+
+def test_the_dev_launcher_announces_the_port_it_actually_uses(tmp_path):
+    """`scripts/dev.py --check` prints the URL it is about to serve and then stops short of serving. The
+    announced port and the uvicorn argument must be the same number, or the printed link is a lie."""
+    import subprocess
+
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PORT": "9200",
+           "ALIBI_DB": str(tmp_path / "dev.db")}
+    venv_py = ROOT / ".venv" / "bin" / "python"
+    if venv_py.exists():
+        env["ALIBI_PY"] = str(venv_py)
+    r = subprocess.run([sys.executable, "scripts/dev.py", "--check"], cwd=str(ROOT), env=env,
+                       capture_output=True, text=True, timeout=180)
+    out = r.stdout + r.stderr
+    assert r.returncode == 0, out[-500:]
+    assert "localhost:9200" in out, out[-400:]
