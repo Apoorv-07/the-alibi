@@ -9,9 +9,19 @@ PY ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 # `checks` would otherwise be considered "up to date" because a *directory* of that name exists — make
 # silently does nothing and exits 0, which is the worst possible failure for a CI target: a green run
 # that ran no checks. Everything below is therefore declared phony, and `verify` depends on all of them.
-.PHONY: help test smoke checks verify poc eval seed serve dev dev-check docker docker-llm lint clean retention browser browser-check
+.PHONY: help setup setup-browser test smoke checks verify poc eval seed serve dev dev-check docker docker-llm lint clean retention browser browser-check
 help:
 	@grep -E '^[a-z-]+:.*#' Makefile | sed 's/:.*#/ \t/' | sort
+
+setup:           ## create ./.venv and install the pins (run this after a fresh clone or a recycled VM)
+	@test -d .venv || python3 -m venv .venv
+	.venv/bin/pip install -q --disable-pip-version-check -r requirements.txt
+	@echo "venv ready — every other target finds it automatically (PY auto-detects ./.venv/bin/python)"
+	@echo "next: make dev   (diagnoses, seeds if empty, serves on :8000)"
+
+setup-browser:   ## + the Chromium the visual harness needs (npm install + browser download, ~140 MB)
+	$(MAKE) setup
+	$(MAKE) browser
 
 test:            ## unit + service tests (the guarantees, on the shipped code path)
 	$(PY) -m pytest tests/ -q -W ignore::DeprecationWarning
@@ -56,7 +66,7 @@ browser:           ## install the Chromium + shared libs the visual harness need
 	@echo "if chromium cannot start here: it wants libnss3/libnspr4/libatk/libcups/libasound; see"
 	@echo "docs/UI-DESIGN.md → 'Running the browser harness on a bare container'"
 
-browser-check:     ## the visual contract: 99 checks in Chromium across both design systems
+browser-check:     ## the visual contract: 111 checks in Chromium across both design systems (~5 min; needs `make setup-browser`)
 	@curl -sf -o /dev/null http://127.0.0.1:8000/healthz || { echo "needs a running app: make dev  (or: ALIBI_DB=./alibi.db ./venv/bin/python -m uvicorn alibi.server:app --port 8000)"; exit 2; }
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH:-$$HOME/.local/lib} node .tools/verify-fluid.mjs
 

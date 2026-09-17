@@ -132,9 +132,10 @@ not even *create* the canvas, orb or cursor nodes: absent is a stronger promise 
 ## Verifying an interface change
 
 ```bash
-make test                       # 195 tests, incl. tests/test_renovation.py (37, the language contract)
+make test                       # 199 tests, incl. tests/test_renovation.py (34, the language contract)
 ./.venv/bin/python scripts/smoke.py     # 24/24 pages render cold + seeded, no template flags
-make browser && make browser-check      # 111 checks in Chromium across both design systems
+make setup-browser                      # venv + playwright + chromium, once (make browser alone covers just the browser)
+make browser-check                        # 111 checks in Chromium across both design systems (~5 min)
 LD_LIBRARY_PATH=$HOME/.local/lib node .tools/e2e-review.mjs
                                         # the one irreversible act, driven through the real Review form:
                                         # radio → "Use that" → toast → reload → "recently answered", and the
@@ -153,9 +154,13 @@ one sentence. It renders `/?demo=1` on the running server, so start one first (`
 `make browser-check` (i.e. `.tools/verify-fluid.mjs`) drives real Chromium, so it needs two things a Python-only image does not have.
 
 ```bash
-make browser          # .tools/npm install playwright, then download chromium + the headless shell
-make browser-check    # runs the harness with LD_LIBRARY_PATH=$HOME/.local/lib
+make setup-browser    # the venv + .tools/npm install playwright + chromium and the headless shell
+make browser-check    # 111 checks, ~5 min on a shared CPU box (it is software-rasterised WebGL), LD_LIBRARY_PATH=$HOME/.local/lib
 ```
+
+`make setup-browser` is `make setup` + `make browser`, and it is the whole recovery for a machine that persisted this
+repo but dropped generated directories — which is what a sandboxed VM does between sessions, so the run order below
+was written for that case: `make setup-browser`, then the `.deb` extraction, then the check.
 
 If Chromium exits with `error while loading shared libraries`, the container lacks the usual GL/GTK
 libraries (`libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 libxkbcommon0

@@ -53,7 +53,11 @@ def main() -> int:
         try:
             __import__(mod)
         except ImportError:
-            line(label, "MISSING", "pip install -r " + str(ROOT / "requirements.txt"))
+            # `pip install -r …` alone is the wrong advice in two of the three cases that reach here: on a
+            # Debian/PEP-668 system Python it is refused outright, and in a VM whose .venv was deleted it
+            # installs into the interpreter that is about to be thrown away. `make setup` creates the venv
+            # and installs into it, and every other target then finds it.
+            line(label, "MISSING", "make setup   (or: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt)")
             return 2
         line(label, "present")
 
