@@ -80,13 +80,28 @@ def main() -> int:
         line("ledger", "{} source(s), {} claim(s), false trust {}".format(sources, claims, trust))
 
     port = os.environ.get("PORT", "8000")
+    reload_on = os.environ.get("RELOAD", "1") not in ("0", "false", "no", "")
     print("\n  → http://localhost:{}".format(port))
-    print("    health  /api/health        AI  /api/ai-check?dry=false        metrics  /metrics\n")
+    print("    health  /api/health        AI  /api/ai-check?dry=false        metrics  /metrics")
+    check_only = "--check" in sys.argv             # the diagnostics above are the test; skip the server
+    if check_only:
+        print()
+    else:
+        # never advertise a behaviour the process is not going to have: `--check` exits before any server exists
+        print("    {}\n".format("edits under alibi/ and web/ restart the server (RELOAD=0 to stop that)"
+                                if reload_on else "no reload: restart by hand after editing a .py file"))
     sys.stdout.flush()
-    if "--check" in sys.argv:                      # the diagnostics above are the test; skip the server
+    if check_only:
         return 0
-    os.execvp(sys.executable, [sys.executable, "-m", "uvicorn", "alibi.server:app",
-                               "--host", "0.0.0.0", "--port", port])
+    # `--reload`, because this is the development launcher and `make serve` is the one without it. Watching
+    # two directories rather than the repo root matters: a reload watcher on `.` restarts the server every
+    # time a test writes a database or `make seed` commits rows, which turns the loop it is meant to speed
+    # up into a server that falls over mid-click. Jinja hot-reloads templates either way; before this, an
+    # edited helper in alibi/present.py was silently ignored and every page kept the old code.
+    cmd = [sys.executable, "-m", "uvicorn", "alibi.server:app", "--host", "0.0.0.0", "--port", port]
+    if reload_on:
+        cmd += ["--reload", "--reload-dir", str(ROOT / "alibi"), "--reload-dir", str(ROOT / "web")]
+    os.execvp(sys.executable, cmd)
 
 
 if __name__ == "__main__":

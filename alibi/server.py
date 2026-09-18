@@ -444,7 +444,10 @@ def create_app(twin: Twin | None = None) -> FastAPI:
     @app.get("/settings", response_class=HTMLResponse)
     def settings(request: Request):
         prov = twin.routing()
-        return page(request, "settings.html", cfg=twin.cfg.redacted_view(), prov=prov,
+        # calm=True: Settings is the sixth primary destination, so it renders in the same system as the
+        # other five. Before this it inherited the fluid layer and — because the "Reading preferences" block
+        # was gated on `calm` — the only control for switching the fluid layer off never appeared.
+        return page(request, "settings.html", calm=True, cfg=twin.cfg.redacted_view(), prov=prov,
                     policy=twin.policy, mode=resolve_mode(twin.cfg),
                     db=str(twin.cfg.db_path), counts=twin.db.stats())
 

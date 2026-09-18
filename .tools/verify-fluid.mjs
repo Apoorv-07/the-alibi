@@ -32,11 +32,15 @@ const VIEWPORTS = [
    calm home page, so every cinematic check re-points at /technical/cockpit — otherwise the suite would pass
    by accident, on pages that no longer have a canvas. */
 const PAGES = ["/technical/cockpit", "/twin", "/timeline", "/claims", "/lineage", "/conflicts", "/queue",
-               "/feasibility", "/risk", "/actions", "/sources", "/privacy", "/eval", "/audit", "/settings",
+               "/feasibility", "/risk", "/actions", "/sources", "/privacy", "/eval", "/audit",
                "/docs", "/technical"];
-/* `/settings` is deliberately NOT here: it is a working form surface (uploads, wipe, model config) that
-   keeps the technical shell, and pretending it is one of the calm six would make this check a lie. */
-const CALM_PAGES = ["/?demo=1", "/calendar", "/tasks", "/review", "/evidence", "/technical", "/onboard"];
+/* `/settings` used to sit in the list above, on the grounds that it is a working form surface that keeps the
+   technical shell. That reasoning lost: a primary destination that renders in the other design system is two
+   design systems, and gating its "Reading preferences" block on `calm` left the only fluid-layer control
+   unrendered. So it is asserted as calm here — and the sync form it still carries is exactly the calm page's
+   behaviour, not evidence of a technical shell. */
+const CALM_PAGES = ["/?demo=1", "/calendar", "/tasks", "/review", "/evidence", "/settings", "/technical",
+                    "/onboard"];
 
 const browser = await chromium.launch({
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu-sandbox", "--no-sandbox"],
@@ -488,6 +492,13 @@ if (process.argv.includes("--selftest")) selfTest();
         calm.every(p => p.canvas === 0 && p.cursor === 0 && p.orbs === 0 && !p.raf && !p.external
                        && p.errors.length === 0 && p.h1 === 1 && p.overflow <= 1),
         calm.filter(p => p.errors.length || p.canvas || p.raf).map(p => p.path).join(",") || `${calm.length} pages`);
+  // coverage, asserted rather than implied: every check in this section is "fail-only" (a page that is fine
+  // emits nothing), so the total number of checks says nothing about *which* pages were opened. Without this,
+  // dropping /settings from CALM_PAGES would keep the suite green and quietly stop measuring a destination.
+  check(`the calm sweep measured every destination (${calm.length}: ${calm.map(c => c.path).join(" ")})`,
+        calm.length === CALM_PAGES.length && CALM_PAGES.every(x => calm.some(c => c.path === x))
+        && calm.some(c => c.path === "/settings"),
+        calm.length === CALM_PAGES.length ? "" : `only ${calm.length} of ${CALM_PAGES.length} pages opened`);
   check("the calm reading measure stays inside 30–90ch",
         calm.every(p => p.measure === -1 || (p.measure <= 800 && p.measure >= 320)),
         calm.map(p => `${p.path}:${p.measure}px`).join(" | "));
@@ -659,8 +670,9 @@ for (const vp of VIEWPORTS) {
 /* -------------------------------------------------- 9 · the sync + POST round trip --- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const { page, errors } = await openPage(ctx, "/settings");
-  await page.goto(url + "/technical/cockpit", { waitUntil: "load" });
+  // starts on the cockpit itself: the sync form lives in the sidebar on every page, so there was never a
+  // reason to arrive from /settings, and doing so made this section look like it depended on that page's shell
+  const { page, errors } = await openPage(ctx, "/technical/cockpit");
   await page.waitForTimeout(500);
   const before = await page.evaluate(() => document.querySelector(".hero-figures .figure--lead .n").textContent.trim());
   await page.click('form[action="/api/sync"] button');

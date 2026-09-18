@@ -416,3 +416,93 @@ def test_evidence_rows_keep_the_value_and_its_quote_together(pair):
     assert "Wed 30 Sep 2026 date only, no time" in body, body[:400]
     for leak in ("{&quot;", '"date"', "precision", "syllabus_pdf"):
         assert leak not in html, f"raw column {leak} reached the page"
+
+
+# ---------------------------------------------------------------- settings ---
+# Settings is the sixth destination and it was the one still rendering in the *fluid* system. Two bugs came
+# from that and both are silent: the page loaded the other stylesheet, and its "Reading preferences" block —
+# the only control that turns the fluid layer off — was gated on `calm`, so it never rendered at all. The
+# README told people to click a control that did not exist. Hence: assert the layer, and assert the control.
+
+def test_settings_is_a_calm_destination_with_a_reachable_toggle(pair):
+    c, _ = pair
+    html = c.get("/settings").text
+    assert "/static/calm.css?v=" in html and "/static/calm.js?v=" in html
+    assert 'href="/static/alibi.css' not in html          # the link, not the explanatory comment
+    for fluid in ("atmosphere.js", "scene.js", "motion.js", "<canvas"):
+        assert fluid not in html, f"/settings still carries the fluid layer: {fluid}"
+    assert 'id="fluid-toggle"' in html, "the fluid-layer control must render, not sit behind a false condition"
+    assert "Reading preferences" in html
+    assert html.count("<h1") == 1
+
+
+def _visible(html: str) -> str:
+    """Page text *outside* the raw disclosure: identifiers belong in `policy | tojson` and nowhere else, so
+    judging the prose means excluding the one place they are legitimately the thing being configured."""
+    stripped = re.sub(r'<details class="deep".*?</details>', " ", html, flags=re.S)
+    return text(stripped)
+
+
+def test_settings_phrases_every_date_and_code(pair):
+    c, _ = pair
+    body = norm(_visible(c.get("/settings").text))
+    assert not re.search(r"\d{4}-\d{2}-\d{2}", body), "a raw ISO date reached the prose, not the receipt"
+    for code in ("earliest_safe", "rules_only", "attendance_threshold", "deterministic_simulator", "None"):
+        assert code not in body, f"{code!r} is internal state, not something a student should have to read"
+    assert "Fri 30 Oct 2026" in body                      # the seeded policy's defaulter freeze, phrased
+    assert "75% per subject" in body
+
+
+def test_the_raw_layer_stays_one_click_below(pair):
+    """Plain language on top, the actual bytes underneath: paraphrasing config without an escape hatch is how
+    an admin page becomes something you have to trust."""
+    c, _ = pair
+    html = c.get("/settings").text
+    assert html.count('<details class="deep">') >= 3
+    for needle in ("attendance_threshold", "LM_STUDIO_API_KEY", "max_cloud_egress_bytes_per_day"):
+        assert needle in html, f"{needle} vanished from the page entirely"
+    # a substring search for "sk-" would match `for="ask-q"` in the Ask form — which is exactly what it did.
+    # The real question is narrower: is any key rendered as a *value*? The redacted view stores booleans, so
+    # a quoted string next to a secret's name is the failure, and that is what is asserted here.
+    raw = re.search(r'<details class="deep">.*?</details>', html, re.S).group(0)
+    assert '"secrets_present"' in raw
+    assert not re.search(r'"(?:LM_STUDIO_API_KEY|OPENAI_API_KEY|GEMINI_API_KEY|GOOGLE_GEMINI_API_KEY|'
+                         r'GROQ_API_KEY|CEREBRAS_API_KEY|OPENROUTER_API_KEY|TELEGRAM_BOT_TOKEN)"\s*:\s*"',
+                         raw), "a secret is rendered as something other than presence"
+
+
+class _OnlyPolicy:
+    """Stand-in twin: `policy_words` reads the policy and the frozen date, nothing else. A thin policy file
+    is a real installation state — a colleague edits one key out to see what happens — so the fallbacks are
+    tested as behaviour, not as a template's idea of what `or` does."""
+
+    def __init__(self, policy):
+        self.policy = policy
+        self.db = None        # Presentation's constructor takes the handle; policy_words never uses it
+
+
+def test_policy_words_reports_absence_instead_of_inventing_it():
+    pw = Presentation(_OnlyPolicy({})).policy_words()          # type: ignore[arg-type]
+    assert pw["name"] == "no policy file" and pw["empty"] is True and pw["authority"] == []
+    for label, value in pw["rows"]:
+        assert value.strip(), f"{label!r} rendered nothing at all"
+        assert "None" not in value and "undefined" not in value and "{" not in value
+    tie = dict(pw["rows"])["If two sources give different dates"]
+    assert "earliest" in tie, "with no tie_break set the ledger does use the earliest — say what it does"
+
+
+def test_policy_words_formats_a_real_policy(pres: Presentation):
+    body = dict(pres.policy_words()["rows"])
+    assert body["Attendance needed to sit an exam"] == "75% per subject"
+    assert "Fri 30 Oct 2026" in body["Reduced on a certificate"]
+    assert pres.date_words("2026-09-22") == "Tue 22 Sep 2026"
+    assert pres.date_words("sometime in October") == "sometime in October"   # echoed, never reformatted
+    assert pres.date_words(None) == "not set in this policy"
+
+
+def test_date_words_is_not_the_deadline_voice(pres: Presentation):
+    """`when_phrase` says "Due", which is right for a task and wrong for a freeze date nobody must act on."""
+    from alibi.present import when_phrase as deadline_voice
+    phrased = pres.date_words("2026-09-22")
+    assert phrased == "Tue 22 Sep 2026"
+    assert "Due" not in phrased and "Due" in deadline_voice(dt.date(2026, 9, 22), dt.date(2026, 9, 14))

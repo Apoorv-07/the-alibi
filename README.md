@@ -20,7 +20,7 @@ one. So nothing here is trusted because a model said it.
 make setup                           # ./.venv + the 7 pins (ortools, fastapi, uvicorn, jinja2, python-multipart, pytest, httpx)
 source .venv/bin/activate            # optional: every target finds ./.venv on its own, so `make` needs no activation
 cp .env.example .env                 # optional; an empty .env is a valid, fully-offline configuration
-make dev                             # diagnoses the environment, seeds the demo corpus if empty, serves :8000
+make dev                             # diagnoses the environment, seeds the demo corpus if empty, serves :8000 and reloads on edits
 ```
 
 The two `pip`/`venv` lines the quick start used to require are now one target, because the second and third
@@ -201,7 +201,7 @@ only, and the reader can veto it from Settings for the whole browser. `docs/UI-D
 ```bash
 make test          # 199 tests (~30s), incl. tests/test_renovation.py: the six destinations + the language contract
 make smoke         # boots on an EMPTY db, seeds, renders all 24 pages (200, or 302→/onboard when cold), /static/*, traversal, the manual-answer loop
-make browser-check   # 111 checks in Chromium across both design systems (`make setup-browser` installs what it needs, once; ~5 min, software-rasterised WebGL): the fluid layer paints, the calm pages carry no canvas/cursor/inertia at 4 viewports and the evidence rows never clip, both sync round trips report in one sentence
+make browser-check   # 112 checks in Chromium across both design systems (`make setup-browser` installs what it needs, once; ~5 min, software-rasterised WebGL): the fluid layer paints, the calm pages carry no canvas/cursor/inertia at 4 viewports and the evidence rows never clip, both sync round trips report in one sentence
 make checks        # focused probes: verifier edges, attribution, scenario calibration
 make eval          # regenerate EVAL_REPORT.{md,json} (zero model calls needed)
 make serve | seed | retention | docker | docker-llm | lint | clean
@@ -249,6 +249,8 @@ python3 -m alibi.cli {status|sync|ingest FILE|why TASK|conflicts|plan [--draft]|
 | the calm pages feel flat, no glow, no parallax | that is the design: the fluid layer belongs to the technical pages. It is there on `/technical/cockpit` — if it is missing there too, `localStorage` has `alibi.fluid.off=1` (Settings → Reading preferences turns it back on) or your OS asks for reduced motion |
 | the mobile nav bar shows two rows, or overlaps content | a CSS regression: the bar must be one horizontally-scrollable row. `node .tools/verify-fluid.mjs` measures its height and tap targets at 390px |
 | a `calm.css` rule appears not to apply | check the emission order in `base.html`, not the selector: layer 1 (inline) must come **before** the `<link>`, or the fallback silently wins on source order |
+| you edited `alibi/*.py` and nothing changed | `make dev` reloads on edits under `alibi/` and `web/` (`RELOAD=0 make dev` stops that). `make serve` does not reload — it is the run-it-as-deployed target, so restart it after a Python edit |
+| the Settings page looks plain next to the cockpit | correct, and it is the design: all six primary destinations render calm, and the fluid layer is on the technical surfaces. Its **Reading preferences** section is where you switch the layer off for the advanced pages |
 | a broken/migrated-sideways database | the recovery is `rm alibi.db && make seed` *because* the ledger is derived from a corpus in this repo; on a real installation, restore the file (see `docs/DEPLOYMENT.md`) |
 | port already in use | `PORT=8080 make dev` (honoured by `make serve` too); the container maps `8000:8000` and `docker compose down` releases it |
 | `ModuleNotFoundError: ortools` / `fastapi`, or `make test` says `No module named pytest` | the interpreter has no deps — usual cause is a fresh clone, or a VM/sandbox that persisted the repo but dropped generated directories (`.venv`, `node_modules`, `~/.cache`) like this one does. Fix: `make setup`. `make dev` diagnoses exactly this and prints the same remedy rather than a traceback |

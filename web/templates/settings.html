@@ -1,90 +1,180 @@
 {% extends "base.html" %}
+{# Settings is one of the six primary destinations, so it belongs to the calm system like the other five —
+   not to the fluid layer, which stays on the technical surfaces where motion earns its place.
+
+   Two things this file has to keep true. First, nothing here is a decoration: every row is a value the
+   process read from the environment or from the ledger, and the raw JSON stays one click below, because a
+   page that only paraphrases configuration is a page you cannot audit. Second, the phrasing of policy and
+   dates comes from `Presentation`, not from this template, so Settings cannot drift into saying
+   `2026-10-30` while Tasks says `Due Fri 30 Oct 2026`. #}
+{% from "_ui.html" import page_head %}
 {% block title %}Settings{% endblock %}
+
 {% block hero %}
-<header class="scene-head" data-reveal>
-  <p class="eyebrow">read from the environment at startup · mode {{ prov.mode }}</p>
-  <div class="scene-grid">
-    <div>
-      <h1 class="hero-line">Config, not<br><em>code</em>.</h1>
-      <p class="sub lede" style="margin-top:20px">What this instance is configured to do, read from the environment at startup. Values are shown so you can check them; secrets are shown as presence only, and API keys are never sent to the browser at all.</p>
-    </div>
-    <aside class="c-4" data-depth="3.1">
-      <p class="lead">A different college is a different file.</p>
-      <p class="mini" style="margin-top:10px">Authority tiers, the eligibility floor, the condonation floor, the supersession rule and the late-submission default all live in policy. That is the reason the same build is portable and the rules are not baked in.</p>
-    </aside>
-  </div>
-</header>
+{{ page_head("This machine, as configured",
+   "What ALIBI is allowed to do here, read from the environment at startup. Values are shown so you can check
+    them against your own shell. Secrets are shown as presence only — an API key is never sent to the browser.",
+   counts.claims ~ " claim" ~ ("" if counts.claims == 1 else "s") ~ " on file") }}
 {% endblock %}
 
 {% block body %}
 
-<div class="grid g2">
-<div class="panel">
-  <h3>Runtime</h3>
-  <pre>{{ cfg | tojson(indent=1) }}</pre>
-  <h3>Provider probe (live)</h3>
-  <pre>mode       {{ prov.mode }}
-local      {{ prov.local | tojson }}
-cloud      {{ prov.cloud | tojson }}
-simulated  {{ prov.simulated }}
-note       {{ prov.fallback_note }}</pre>
+<section class="sec" aria-labelledby="rt-h">
+  <h2 id="rt-h">What it can do right now</h2>
+  <dl class="kv">
+    <dt>Model available</dt>
+    <dd>{% if mode.local_ok %}yes — {{ mode.local_model }}{% else %}no model answered the probe, so extraction
+      runs on the deterministic rules and every claim says so{% endif %}</dd>
+    <dt>Cloud escalation</dt>
+    <dd>{% if cfg.cloud_escalation_enabled %}allowed, within the limits below{% else %}turned off: nothing
+      leaves this machine{% endif %}{% if mode.cloud_reason %} — {{ mode.cloud_reason }}{% endif %}</dd>
+    <dt>Day's cloud budget</dt>
+    <dd>{{ cfg.budget_usd_per_day }} USD · {{ (cfg.max_cloud_egress_bytes_per_day / 1000000) | round(1) }} MB ·
+      {{ cfg.max_cloud_calls_per_artifact }} calls per document</dd>
+    <dt>Confidence needed to believe an extraction</dt>
+    <dd>{{ (cfg.confidence_floor * 100) | round | int }}% of the model's own confidence — below that the
+      candidate is dropped rather than recorded as a maybe</dd>
+    <dt>Actions that change something</dt>
+    <dd>{% if cfg.require_action_approval %}every one waits for you to approve it{% else %}applied without
+      asking — not the recommended setting{% endif %}{% if cfg.dry_run %}; nothing reaches an outside system
+      while the dry run is on{% endif %}{% if not cfg.allow_irreversible %}; irreversible actions are
+      refused{% endif %}</dd>
+    <dt>How long the text is kept</dt>
+    <dd>{{ cfg.retention_days }} days for the ledger, {{ cfg.raw_content_retention_days }} days for the raw
+      document text — after that the quotes and hashes remain and the paragraph does not</dd>
+    <dt>Ledger file</dt>
+    <dd><code class="mono">{{ db }}</code></dd>
+  </dl>
+  <p class="kv__note">Back it up with <code>sqlite3 {{ db }} ".backup twin.db"</code>. Delete the file and this
+    instance knows nothing about anyone — that is the erase story, not a setting.</p>
+  <details class="deep">
+    <summary class="deep__link">The same settings as the process holds them</summary>
+    <dl class="kv">
+      <dt>redacted config</dt><dd><code class="mono">{{ cfg | tojson(indent=1) }}</code></dd>
+      <dt>provider probe</dt><dd><code class="mono">{{ mode | tojson(indent=1) }}</code></dd>
+    </dl>
+  </details>
+</section>
+
+<section class="sec" aria-labelledby="se-h">
+  <h2 id="se-h">Keys this process can see</h2>
+  <p class="mini">Presence only. ALIBI never renders a key, and none of these values is sent to the browser.</p>
+  <ul class="stack">
+    {% for name, is_set in cfg.secrets_present | dictsort %}
+    <li><code class="mono">{{ name }}</code>
+      {% if is_set %}<span class="tag--soft is-ok">set in the environment</span>
+      {% else %}<span class="tag--soft">not set</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="sec {% if prov.simulated %}sec--warn{% else %}sec--quiet{% endif %}" aria-labelledby="pr-h">
+  <h2 id="pr-h">Who read the documents</h2>
   <div class="notice {{ 'bad' if prov.simulated else '' }}">
     {% if prov.simulated %}Extraction is running on the offline deterministic simulator. Everything on
     the other pages is the real pipeline — the verifier, ledger, conflicts, solver — with a regex in the
-    extractor slot. Install a model to replace it:
-    <code>ollama pull gemma4:e4b</code>.
+    extractor slot. Install a model to replace it, then restart; nothing else about this instance changes.
     {% else %}A model answered the health probe. Its identity, version and latency are recorded on every
-    claim it touched, so a later disagreement can be attributed.<script>
-/* The button is built by the script that reads the store, because a control whose label is a guess about
-   the current value is worse than no control: it would have to say "off" while the setting says "on". */
-(function () {
-  var btn = document.getElementById("fluid-toggle");
-  if (!btn) return;
-  var off = false;
-  try { off = localStorage.getItem("alibi.fluid.off") === "1"; } catch (e) { }
-  if (!("localStorage" in window)) { btn.disabled = true; btn.textContent = "This browser blocks saved preferences"; return; }
-  function paint() { btn.textContent = off ? "Turn the fluid layer off for this browser"
-                                           : "Turn the fluid layer back on for this browser"; }
-  paint();
-  btn.addEventListener("click", function () {
-    off = !off;
-    try { localStorage.setItem("alibi.fluid.off", off ? "1" : "0"); } catch (e) { }
-    paint();
-    location.reload();      // the layer is read once, at load; pretending it could be unwound mid-page is worse
-  });
-})();
-</script>
-{% endif %}
+    claim it touched, so a later disagreement can be attributed to it rather than argued with.{% endif %}
+    {% if prov.fallback_note %}<br><span class="mini">{{ prov.fallback_note }}</span>{% endif %}
   </div>
-</div>
-<div class="panel">
-  <h3>Institution policy (this is what makes it portable)</h3>
-  <pre>{{ policy | tojson(indent=1) }}</pre>
-  <p class="mini">Authority tiers, the 75% eligibility floor, the condonation floor, the supersession
-    rule and the late-submission default. Config, not code: a different college is a different file, and
-    <code>policy["authority"]</code> is the reason "the newest message wins" is not the rule.</p>
-</div>
-</div>
-<div class="panel" style="margin-top:12px">
-  <h3>Counts</h3>
-  <pre>{{ counts | tojson(indent=1) }}</pre>
-  <p class="mini">Database: <code>{{ db }}</code>. WAL mode, foreign keys on, busy timeout 4s.
-    Back it up with <code>sqlite3 {{ db }} ".backup twin.db"</code> and delete it to erase everything.</p>
-</div>
-{% endblock %}
+  <details class="deep">
+    <summary class="deep__link">The probe's own numbers</summary>
+    <dl class="kv">
+      <dt>local</dt><dd><code class="mono">{{ prov.local | tojson }}</code></dd>
+      <dt>cloud</dt><dd><code class="mono">{{ prov.cloud | tojson }}</code></dd>
+    </dl>
+  </details>
+</section>
 
-{# ── the renovation's own settings block, appended so the existing panels (config, retention, model)
-   stay exactly as they are and keep working. Two things a student is ever asked to decide: how loud the
-   environment is, and whether the technical surfaces are one click away. ── #}
-{% if calm %}
-<section class="sec" aria-labelledby="calm-h" style="margin-top:26px">
-  <h2 id="calm-h">Reading preferences</h2>
+{% set pw = present.policy_words() %}
+<section class="sec" aria-labelledby="po-h">
+  <h2 id="po-h">The rules it applies — {{ pw.name }}</h2>
+  <p class="mini">A different college is a different file. These are the numbers a student is ultimately
+    argued with, and they are the reason the same build is portable: nothing below is baked into the code.</p>
+  <dl class="kv">
+    {% for label, value in pw.rows %}
+    <dt>{{ label }}</dt><dd>{{ value }}</dd>
+    {% endfor %}
+  </dl>
+  <h3 class="mini" style="margin:16px 0 6px">How much each kind of source is believed</h3>
+  {% if pw.empty %}
+  <p class="mini">This policy file sets no authority tiers, so every source is treated as equally believable —
+    which is a decision someone should make deliberately.</p>
+  {% else %}
+  <table class="tbl">
+    <thead><tr><th scope="col">Source kind, as the policy names it</th><th scope="col">Trust</th></tr></thead>
+    <tbody>
+      {% for a in pw.authority %}
+      <tr><th scope="row"><code class="mono">{{ a.kind }}</code></th><td>{{ a.trust }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="kv__note">A rumour sits at 20% and a course portal at 90% on purpose: what a source is worth is a
+    policy decision, so it is stated here where it can be argued with, not hidden in a prompt. The two names
+    in the left column are the policy file's own keys — they are what you would edit.</p>
+  {% endif %}
+  <details class="deep">
+    <summary class="deep__link">The policy file, key for key</summary>
+    <dl class="kv"><dt>policy</dt><dd><code class="mono">{{ policy | tojson(indent=1) }}</code></dd></dl>
+    <p class="mini">Every row above is one of these keys. Where the page says a number, that is the number;
+      where it says the policy does not set one, it is genuinely absent from this file.</p>
+  </details>
+</section>
+
+<section class="sec" aria-labelledby="co-h">
+  <h2 id="co-h">What is on the ledger</h2>
+  <dl class="kv">
+    <dt>Sources read</dt><dd>{{ counts.sources }} ({{ counts.observations }} observation{{ "" if counts.observations == 1 else "s" }})</dd>
+    <dt>Claims</dt><dd>{{ counts.claims }} — {{ counts.claims_verified }} grounded by the verifier,
+      {{ counts.claims_review }} waiting on you</dd>
+    <dt>Conflicts it could not settle</dt><dd>{{ counts.conflicts }}</dd>
+    <dt>Rows in the change log</dt><dd>{{ counts.changes }}</dd>
+    <dt>Model calls recorded</dt><dd>{{ counts.model_calls }}{% if counts.llm_involved_claims %}, touching
+      {{ counts.llm_involved_claims }} claim{{ "" if counts.llm_involved_claims == 1 else "s" }}{% else %};
+      no claim in the ledger came from a model{% endif %}</dd>
+    <dt>Calls that left this machine</dt><dd>{{ counts.cloud_calls }} ({{ counts.cloud_bytes }} bytes)</dd>
+    <dt>Quarantined as prompt injection</dt><dd>{{ counts.injections_quarantined }}</dd>
+    <dt>Claims trusted without support</dt><dd>{{ counts.false_trust_count }} of {{ counts.claims_verified }}
+      <span class="mini">({{ (counts.false_trust_rate * 100) | round(2) }}%) — re-checked every time this page
+      renders, not remembered from the last run</span></dd>
+  </dl>
+  <details class="deep">
+    <summary class="deep__link">Every count, as one query produced it</summary>
+    <dl class="kv"><dt>stats</dt><dd><code class="mono">{{ counts | tojson(indent=1) }}</code></dd></dl>
+  </details>
+</section>
+
+<section class="sec" aria-labelledby="read-h">
+  <h2 id="read-h">Reading preferences</h2>
   <p class="mini">ALIBI's six main pages are already motion-free. The advanced pages carry the fluid layer —
-    the WebGL field, the inertial scroll, the cursor — and it can be turned off here if it is in your way.</p>
-  <div class="row" style="margin-top:10px">
+    the WebGL field, the inertial scroll, the cursor — and it can be turned off here if it is in your way.
+    This is a setting of this browser, not of the ledger: it is stored locally and never sent anywhere.</p>
+  <div style="margin-top:10px">
     <button class="btn" type="button" id="fluid-toggle">Checking this browser…</button>
   </div>
+  {# The button is labelled by the script that reads the store, because a control whose label is a guess about
+     the current value is worse than no control: it would have to say "off" while the setting says "on". #}
+  <script>
+    (function () {
+      var btn = document.getElementById("fluid-toggle");
+      if (!btn) return;
+      var off = false;
+      try { off = localStorage.getItem("alibi.fluid.off") === "1"; } catch (e) { }
+      if (!("localStorage" in window)) { btn.disabled = true; btn.textContent = "This browser blocks saved preferences"; return; }
+      function paint() { btn.textContent = off ? "Turn the fluid layer off for this browser"
+                                              : "Turn the fluid layer back on for this browser"; }
+      paint();
+      btn.addEventListener("click", function () {
+        off = !off;
+        try { localStorage.setItem("alibi.fluid.off", off ? "1" : "0"); } catch (e) { }
+        paint();
+        location.reload();      // the layer is read once, at load; pretending it could be unwound mid-page is worse
+      });
+    })();
+  </script>
   <p class="mini" style="margin-top:12px">Everything technical, in one place:
     <a class="act" href="/technical">claims · lineage · verifier · solver · audit · data routing</a></p>
 </section>
-{% endif %}
+
+{% endblock %}

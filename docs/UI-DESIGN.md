@@ -61,6 +61,16 @@ count is the product's shape, and a seventh rail item is how a command centre sl
 panels. The eleven technical pages did not disappear — they live under `/technical`, grouped, reachable in one
 click from the rail and from Settings.
 
+**All six run on one layer, and the switch is a route argument.** `page(..., calm=True)` puts `data-calm` on the
+`<html>`, emits `calm.css`/`calm.js` instead of `alibi.css`/the motion scripts, and *un-gates* any block written
+`{% raw %}{% if calm %}{% endraw %}`. Settings was left out of that for most of the renovation — it was the sixth
+rail item rendering in the technical shell, and because its Reading-preferences section was gated on `calm`, the
+one control that turns the fluid layer off existed in the template and never reached a browser. Two silent
+failures from one missing keyword, which is why the harness asserts the button's `id` and not merely that the
+page loads: a page can be 200, styled, and still be missing its only interaction. If a route in `NAV` ever gains
+a template without `calm=True`, `test_settings_is_a_calm_destination_with_a_reachable_toggle` and the
+`CALM_PAGES` sweep in `.tools/verify-fluid.mjs` are the two that say so.
+
 **The budget** the renovation was specified against — 80 % obligations and evidence, 15 % what needs
 attention, 5 % system status — is enforced by structure, not by CSS: the attention list is the first section
 and is *absent* when empty (`{% if h.attention %}`), and the system status is one sentence with a link,
@@ -105,7 +115,7 @@ to `/evidence?subject=…`, and one to the JSON at `/api/graph?task=…`). The r
 away; they are never the front page. On `/evidence` the receipts *are* the layer, so it is one claim per row —
 value, quote, source, offsets — and not a four-column table: a 60-character verbatim quote and a 17-character
 date cannot share a fixed grid, and trying produced either a date over three lines or a quote printed across
-its neighbour. That geometry is measured at four viewports by `make browser-check` (111 checks; 12 of them
+its neighbour. That geometry is measured at four viewports by `make browser-check` (112 checks; 12 of them
 "every row carries its receipt / no value wraps / nothing is clipped").
 
 ## Progressive enhancement, honestly bounded
@@ -129,13 +139,18 @@ subscribe a frame. `prefers-reduced-motion: reduce` does the same without being 
 itself from the stored value rather than guessing, and says so plainly if storage is blocked. The calm pages do
 not even *create* the canvas, orb or cursor nodes: absent is a stronger promise than hidden.
 
+The veto lives on a page rather than in an OS setting on purpose, but only if it is reachable: see the
+`calm=True` paragraph above for what happens when the page that hosts it is not itself a calm one.
+`/technical/cockpit` is the one place the layer is expected to be alive, and the harness measures that separately
+from the six.
+
 ## Verifying an interface change
 
 ```bash
 make test                       # 199 tests, incl. tests/test_renovation.py (34, the language contract)
 ./.venv/bin/python scripts/smoke.py     # 24/24 pages render cold + seeded, no template flags
 make setup-browser                      # venv + playwright + chromium, once (make browser alone covers just the browser)
-make browser-check                        # 111 checks in Chromium across both design systems (~5 min)
+make browser-check                        # 112 checks in Chromium across both design systems (~4 min)
 LD_LIBRARY_PATH=$HOME/.local/lib node .tools/e2e-review.mjs
                                         # the one irreversible act, driven through the real Review form:
                                         # radio → "Use that" → toast → reload → "recently answered", and the
@@ -155,12 +170,12 @@ one sentence. It renders `/?demo=1` on the running server, so start one first (`
 
 ```bash
 make setup-browser    # the venv + .tools/npm install playwright + chromium and the headless shell
-make browser-check    # 111 checks, ~5 min on a shared CPU box (it is software-rasterised WebGL), LD_LIBRARY_PATH=$HOME/.local/lib
+make browser-check    # 112 checks, ~4 min on a shared CPU box (it is software-rasterised WebGL), LD_LIBRARY_PATH=$HOME/.local/lib
 ```
 
 `make setup-browser` is `make setup` + `make browser`, and it is the whole recovery for a machine that persisted this
 repo but dropped generated directories — which is what a sandboxed VM does between sessions, so the run order below
-was written for that case: `make setup-browser`, then the `.deb` extraction, then the check.
+was written for that case: `make setup-browser`, then the `.deb` extraction, then the check. `.tools/run-harness.sh` is that sequence as one command, and it is scratch — it is not part of the product and no test depends on it.
 
 If Chromium exits with `error while loading shared libraries`, the container lacks the usual GL/GTK
 libraries (`libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 libxkbcommon0

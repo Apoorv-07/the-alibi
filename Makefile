@@ -66,7 +66,7 @@ browser:           ## install the Chromium + shared libs the visual harness need
 	@echo "if chromium cannot start here: it wants libnss3/libnspr4/libatk/libcups/libasound; see"
 	@echo "docs/UI-DESIGN.md → 'Running the browser harness on a bare container'"
 
-browser-check:     ## the visual contract: 111 checks in Chromium across both design systems (~5 min; needs `make setup-browser`)
+browser-check:     ## the visual contract: 112 checks in Chromium across both design systems (~5 min; needs `make setup-browser`)
 	@curl -sf -o /dev/null http://127.0.0.1:8000/healthz || { echo "needs a running app: make dev  (or: ALIBI_DB=./alibi.db ./venv/bin/python -m uvicorn alibi.server:app --port 8000)"; exit 2; }
 	LD_LIBRARY_PATH=$${LD_LIBRARY_PATH:-$$HOME/.local/lib} node .tools/verify-fluid.mjs
 
